@@ -1,16 +1,16 @@
 version: 2
 jobs:
-  test:
+  build:
     docker:
       - image: circleci/rust:1.31.0-stretch
     steps:
       - checkout
       - restore_cache:
-          key: test-cache
+          key: build-cache
       - run:
           name: Test
           command: cargo test
       - save_cache:
-          key: test-cache
+          key: build-cache
           paths:
             - target
