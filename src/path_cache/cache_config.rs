@@ -52,6 +52,21 @@ pub struct PathCacheConfig {
 
 impl PathCacheConfig {
 	/// an example PathCacheConfig with options set to reduce Memory Usage
+	/// 
+	/// Values:
+	/// ```
+	/// # use hierarchical_pathfinding::PathCacheConfig;
+	/// assert_eq!(
+	/// 	PathCacheConfig {
+	/// 		chunk_size: 16,
+	/// 		cache_paths: false,
+	/// 		keep_insertions: false,
+	/// 		a_star_fallback: true,
+	/// 		perfect_paths: false,
+	/// 	},
+	/// 	PathCacheConfig::LOW_MEM
+	/// );
+	/// ```
 	pub const LOW_MEM: PathCacheConfig = PathCacheConfig {
 		chunk_size: 16,
 		cache_paths: false,
@@ -60,6 +75,21 @@ impl PathCacheConfig {
 		perfect_paths: false,
 	};
 	/// an example PathCacheConfig with options set to improve Performance
+	/// 
+	/// Values:
+	/// ```
+	/// # use hierarchical_pathfinding::PathCacheConfig;
+	/// assert_eq!(
+	/// 	PathCacheConfig {
+	/// 		chunk_size: 8,
+	/// 		cache_paths: true,
+	/// 		keep_insertions: true,
+	/// 		a_star_fallback: false,
+	/// 		perfect_paths: false,
+	/// 	},
+	/// 	PathCacheConfig::LOW_MEM
+	/// );
+	/// ```
 	pub const HIGH_PERFORMANCE: PathCacheConfig = PathCacheConfig {
 		chunk_size: 8,
 		cache_paths: true,
