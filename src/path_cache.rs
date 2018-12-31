@@ -1,4 +1,4 @@
-use crate::{neighbors::Neighborhood, NodeID, Point};
+use crate::{generics, neighbors::Neighborhood, NodeID, Point};
 
 mod chunk;
 use self::chunk::Chunk;
@@ -114,7 +114,30 @@ impl<N: Neighborhood> PathCache<N> {
 			chunks.push(row);
 		}
 
-		// TODO: interconnect Nodes
+		// connect neighboring Nodes across Chunk borders
+		let ids = nodes.keys().cloned().collect::<Vec<_>>();
+		for id in ids {
+			let pos = nodes[&id].pos;
+			let possible = neighborhood.get_all_neighbors(pos);
+			let neighbors = nodes
+				.values()
+				.filter(|node| possible.contains(&node.pos)) // any Node next to me
+				.filter(|node| !node.edges.contains_key(&id)) // that is not already connected
+				.map(|node| (node.id, node.pos))
+				.collect::<Vec<_>>();
+
+			for (other_id, other_pos) in neighbors {
+				let path = generics::Path::new(vec![pos, other_pos], get_cost(pos) as usize);
+				let other_path =
+					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
+
+				let node = nodes.get_mut(&id).unwrap();
+				node.edges.insert(other_id, path);
+
+				let node = nodes.get_mut(&other_id).unwrap();
+				node.edges.insert(id, other_path);
+			}
+		}
 
 		PathCache {
 			width,
