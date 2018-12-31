@@ -1,5 +1,7 @@
 
-A crate to find Paths on a Grid using HPA* (Hierarchical Pathfinding A*) and Hierarchical Dijkstra.
+# A crate to find Paths on a Grid using HPA* (Hierarchical Pathfinding A*) and Hierarchical Dijkstra.
+
+Tests: [![CircleCI](https://circleci.com/gh/mich101mich/hierarchical_pathfinding.svg?style=shield)](https://circleci.com/gh/mich101mich/hierarchical_pathfinding)
 
 ## Introduction
 Finding Paths on a Grid using regular A* and Dijkstra is usually a rather expensive Operation,
