@@ -1,14 +1,14 @@
 #![warn(
-	missing_docs,
-	missing_doc_code_examples,
-	missing_debug_implementations,
-	missing_copy_implementations,
-	trivial_casts,
-	trivial_numeric_casts,
-	unsafe_code,
-	unstable_features,
-	unused_import_braces,
-	unused_qualifications
+    missing_docs,
+    missing_doc_code_examples,
+    missing_debug_implementations,
+    missing_copy_implementations,
+    trivial_casts,
+    trivial_numeric_casts,
+    unsafe_code,
+    unstable_features,
+    unused_import_braces,
+    unused_qualifications
 )]
 
 //! A crate to quickly approximate Paths on a Grid.
@@ -121,8 +121,6 @@
 //!
 //! assert!(path.is_some());
 //! ```
-//! An explanation of the Parameters can be found in [find_path](struct.pathcache.html#method.find_path)
-//! as well as the [neighbors crate](neighbors/index.html).
 //!
 //! Finding multiple Goals:
 //! ```
@@ -165,6 +163,74 @@
 //! assert!(paths.contains_key(&goals[0]));
 //!
 //! assert!(!paths.contains_key(&goals[1]));
+//! ```
+//!
+//! ### Using a Path
+//! The easiest information obtainable from a Path is its existence. Despite being an
+//! approximation of an optimal Path, HPA* is 100% correct when it comes to the existence
+//! of a Path. Meaning that if HPA* cannot find a Path, no one can, and if HPA* returns a Path,
+//! it is valid, given correct Neighborhood and Cost functions.
+//!
+//! The next step is to obtain information about the Path itself. The part that is always
+//! available is the total Cost of the Path. Once again, it is just an approximation. However,
+//! it gives a pretty good estimate of the actual Cost, with only minimal deviations.
+//!
+//! As for following the Path, HPA* was designed to allow Units to immediately start moving
+//! and minimize lost time when the surroundings change in a way that alters the Path.
+//! That is why it does not calculate the full Path immediately. It does, however, generate
+//! the first steps of the Path without too much overhead. That is why it is advised to
+//! mostly use the ```next()``` method of the returned Path for a few steps.
+//!
+//! ```
+//! # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
+//! #
+//! # // create and initialize Grid
+//! # // 0 = empty, 1 = swamp, 2 = wall
+//! # let mut grid = [
+//! #     [0, 2, 0, 0, 0],
+//! #     [0, 2, 2, 2, 2],
+//! #     [0, 1, 0, 0, 0],
+//! #     [0, 1, 0, 2, 0],
+//! #     [0, 0, 0, 2, 0],
+//! # ];
+//! # let (width, height) = (grid.len(), grid[0].len());
+//! #
+//! # let cost_map = [
+//! #     1,  // empty
+//! #     5,  // swamp
+//! #     -1, // wall = solid
+//! # ];
+//! #
+//! # let mut pathfinding = PathCache::new(
+//! #     (width, height), // the size of the Grid
+//! #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
+//! #     Default::default(), // other options for creating the cache
+//! # );
+//! # struct Player{ pos: (usize, usize) }
+//! # impl Player {
+//! #     pub fn move_to(&mut self, pos: (usize, usize)) {
+//! #         self.pos = pos;
+//! #     }
+//! # }
+//! #
+//! let mut player = Player {
+//!     pos: (0, 0),
+//!     //...
+//! };
+//! let goal = (4, 4);
+//!
+//! // find_path returns Some(Path) on success
+//! let path = pathfinding.find_path(
+//!     player.pos,
+//!     goal,
+//!     |(x, y)| cost_map[grid[x][y]], // cost function
+//! );
+//!
+//! if let Some(path) = path {
+//!     player.move_to(path.next().unwrap());
+//! }
+//! assert_eq!(player.pos, (0, 1));
 //! ```
 //!
 //! ### Updating the PathCache
