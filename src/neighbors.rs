@@ -1,71 +1,83 @@
-//! A crate with the most common Neighborhood and Heuristic functions
+//! A crate with the most common Neighborhoods
 
 use crate::Point;
 
-/// Creates a function that returns the [Von Neumann Neighborhood](https://en.wikipedia.org/wiki/Von_Neumann_neighborhood) of a Point.
-/// All Neighbors will be inside [0, width) x [0, height).
+/// Defines how a Path can move along the Grid.
 ///
-/// This is useful for the ```get_all_neighbors``` Parameter of several functions in [PathCache](struct.PathCache.html).
+/// Different Scenarios may have different constraints as to how a Path may be formed.
+/// For example if Agents can only move along the 4 cardinal directions, any Paths generated should
+/// reflect that by only containing those steps.
 ///
-/// ## Examples
-/// Basic usage:
+/// This Trait is a generalized solution to that problem. It provides a function to query all
+/// neighboring Points of an existing Point and a Heuristic for how long it might take to reach
+/// a goal from a Point.
+///
+/// The most common implementations of this Trait are already provided by this Module:
+/// - [```ManhattanNeighborhood```](struct.ManhattanNeighborhood.html) for Agents that can move
+/// up, down, left or right
+/// - [```MooreNeighborhood```](struct.MooreNeighborhood.html) for Agents that can move
+/// up, down, left, right, as well as the 4 diagonals (up-right, ...)
+pub trait Neighborhood {
+	/// Provides a list of Neighbors of a Point
+	///
+	/// Note that it is not necessary to check weather the Tile at a Point is solid or not.
+	/// That check is done later.
+	fn get_all_neighbors(&self, point: Point) -> Vec<Point>;
+	/// Gives a Heuristic for how long it takes to reach ```goal``` from ```point```.
+	///
+	/// This is usually the Distance between the two Points in the Metric of your Neighborhood.
+	///
+	/// If there is no proper way of calculation how long it takes, simply return 0. This will
+	/// increase the time it takes to calculate the Path, but at least it will always be correct.
+	fn heuristic(&self, point: Point, goal: Point) -> usize;
+}
+
+/// A Neighborhood for Agents moving along the 4 cardinal directions.
+///
+/// Also known as [Von Neumann Neighborhood](https://en.wikipedia.org/wiki/Von_Neumann_neighborhood),
+/// Manhattan Metric or [Taxicab Geometry](https://en.wikipedia.org/wiki/Taxicab_geometry).
+///
+/// ```no_code
+/// A: Agent, o: reachable in one step
+///   o
+///   |
+/// o-A-o
+///   |
+///   o
 /// ```
-/// use hierarchical_pathfinding::neighbors::manhattan_neighbors;
-///
-/// let get_all_neighbors = manhattan_neighbors(5, 5);
-///
-/// let mut iter = get_all_neighbors((0, 2));
-/// assert_eq!(iter.next(), Some((1, 2)));
-/// assert_eq!(iter.next(), Some((0, 1)));
-/// assert_eq!(iter.next(), Some((0, 3)));
-/// assert_eq!(iter.next(), None);
-/// ```
-pub fn manhattan_neighbors(
+#[derive(Clone, Copy, Debug)]
+pub struct ManhattanNeighborhood {
 	width: usize,
 	height: usize,
-) -> impl Fn(Point) -> std::vec::IntoIter<Point> {
-	move |(x, y)| {
-		let mut neighbors = vec![];
-		if x > 0 {
-			neighbors.push((x - 1, y));
-		}
-		if x < width - 1 {
-			neighbors.push((x + 1, y));
-		}
-		if y > 0 {
-			neighbors.push((x, y - 1));
-		}
-		if y < height - 1 {
-			neighbors.push((x, y + 1));
-		}
-		neighbors.into_iter()
+}
+
+impl ManhattanNeighborhood {
+	/// Creates a new ManhattanNeighborhood.
+	///
+	/// ```width``` and ```height``` are the size of the Grid to move on.
+	pub fn new(width: usize, height: usize) -> ManhattanNeighborhood {
+		ManhattanNeighborhood { width, height }
 	}
 }
 
-/// Creates a Function that calculates the Distance between a Point and the provided goal using the Manhattan Metric.
-///
-/// This is useful for the ```heuristic``` Parameter of [PathCache::find_path](struct.PathCache.html#find_path).
-///
-/// [The Manhattan Metric](https://en.wikipedia.org/wiki/Taxicab_geometry) (also known as Taxicab Geometry)
-/// is the sum of the absolute difference between the x and y coordinates.
-///
-/// In other words: If an Agent can only move along the 4 Axes, the time required to get
-/// from A to B is the Manhattan Metric between A and B.
-///
-/// ## Examples
-/// Basic usage:
-/// ```
-/// use hierarchical_pathfinding::neighbors::manhattan_heuristic;
-///
-/// let goal = (3, 1);
-/// let heuristic = manhattan_heuristic(goal);
-///
-/// let start = (0, 0);
-///
-/// assert_eq!(heuristic(start), 3 + 1);
-/// ```
-pub fn manhattan_heuristic(goal: Point) -> impl Fn(Point) -> usize {
-	move |point| {
+impl Neighborhood for ManhattanNeighborhood {
+	fn get_all_neighbors(&self, point: Point) -> Vec<Point> {
+		let mut neighbors = vec![];
+		if point.0 > 0 {
+			neighbors.push((point.0 - 1, point.1));
+		}
+		if point.0 < self.width - 1 {
+			neighbors.push((point.0 + 1, point.1));
+		}
+		if point.1 > 0 {
+			neighbors.push((point.0, point.1 - 1));
+		}
+		if point.1 < self.height - 1 {
+			neighbors.push((point.0, point.1 + 1));
+		}
+		neighbors
+	}
+	fn heuristic(&self, point: Point, goal: Point) -> usize {
 		let diff_0 = if goal.0 > point.0 {
 			goal.0 - point.0
 		} else {
@@ -80,81 +92,64 @@ pub fn manhattan_heuristic(goal: Point) -> impl Fn(Point) -> usize {
 	}
 }
 
-/// Creates a function that returns the [Moore Neighborhood](https://en.wikipedia.org/wiki/Moore_neighborhood) of a Point.
-/// All Neighbors will be inside [0, width) x [0, height).
+/// A Neighborhood for Agents moving along the 4 cardinal directions and the 4 diagonals.
 ///
-/// This is useful for the get_all_neighbors Parameter of several functions in [PathCache](struct.PathCache.html).
+/// Also known as [Moore Neighborhood](https://en.wikipedia.org/wiki/Moore_neighborhood),
+/// [Maximum Metric](https://en.wikipedia.org/wiki/Chebyshev_distance) or Chebyshev Metric.
 ///
-/// ## Examples
-/// Basic usage:
+/// ```no_code
+/// A: Agent, o: reachable in one step
+/// o o o
+///  \|/
+/// o-A-o
+///  /|\
+/// o o o
 /// ```
-/// use hierarchical_pathfinding::neighbors::moore_neighbors;
-///
-/// let get_all_neighbors = moore_neighbors(5, 5);
-///
-/// let mut iter = get_all_neighbors((0, 2));
-/// assert_eq!(iter.next(), Some((0, 1)));
-/// assert_eq!(iter.next(), Some((0, 3)));
-/// assert_eq!(iter.next(), Some((1, 1)));
-/// assert_eq!(iter.next(), Some((1, 2)));
-/// assert_eq!(iter.next(), Some((1, 3)));
-/// assert_eq!(iter.next(), None);
-/// ```
-pub fn moore_neighbors(width: usize, height: usize) -> impl Fn(Point) -> std::vec::IntoIter<Point> {
-	move |(x, y)| {
-		let mut neighbors = vec![];
-		if x > 0 {
-			if y > 0 {
-				neighbors.push((x - 1, y - 1));
-			}
-			neighbors.push((x - 1, y));
-			if y < height - 1 {
-				neighbors.push((x - 1, y + 1));
-			}
-		}
-		if y > 0 {
-			neighbors.push((x, y - 1));
-		}
-		if y < height - 1 {
-			neighbors.push((x, y + 1));
-		}
-		if x < width - 1 {
-			if y > 0 {
-				neighbors.push((x + 1, y - 1));
-			}
-			neighbors.push((x + 1, y));
-			if y < height - 1 {
-				neighbors.push((x + 1, y + 1));
-			}
-		}
-		neighbors.into_iter()
+#[derive(Clone, Copy, Debug)]
+pub struct MooreNeighborhood {
+	width: usize,
+	height: usize,
+}
+
+impl MooreNeighborhood {
+	/// Creates a new MooreNeighborhood.
+	///
+	/// ```width``` and ```height``` are the size of the Grid to move on.
+	pub fn new(width: usize, height: usize) -> MooreNeighborhood {
+		MooreNeighborhood { width, height }
 	}
 }
 
-/// Creates a Function that calculates the Distance between a Point and the provided goal using the Maximum Metric.
-///
-/// This is useful for the ```heuristic``` Parameter of [PathCache::find_path](struct.PathCache.html#find_path).
-///
-/// [The Maximum Metric](https://en.wikipedia.org/wiki/Chebyshev_distance) (also known Chebyshev distance)
-/// is the maximum of the absolute difference between the x and y coordinates.
-///
-/// In other words: If an Agent can move along the 4 Axes and all 4 Diagonals, the time required to get
-/// from A to B is the Maximum Metric between A and B.
-///
-/// ## Examples
-/// Basic usage:
-/// ```
-/// use hierarchical_pathfinding::neighbors::moore_heuristic;
-///
-/// let goal = (3, 1);
-/// let heuristic = moore_heuristic(goal);
-///
-/// let start = (0, 0);
-///
-/// assert_eq!(heuristic(start), 3);
-/// ```
-pub fn moore_heuristic(goal: Point) -> impl Fn(Point) -> usize {
-	move |point| {
+impl Neighborhood for MooreNeighborhood {
+	fn get_all_neighbors(&self, point: Point) -> Vec<Point> {
+		let mut neighbors = vec![];
+		if point.0 > 0 {
+			if point.1 > 0 {
+				neighbors.push((point.0 - 1, point.1 - 1));
+			}
+			neighbors.push((point.0 - 1, point.1));
+			if point.1 < self.height - 1 {
+				neighbors.push((point.0 - 1, point.1 + 1));
+			}
+		}
+		if point.1 > 0 {
+			neighbors.push((point.0, point.1 - 1));
+		}
+		if point.1 < self.height - 1 {
+			neighbors.push((point.0, point.1 + 1));
+		}
+		if point.0 < self.width - 1 {
+			if point.1 > 0 {
+				neighbors.push((point.0 + 1, point.1 - 1));
+			}
+			neighbors.push((point.0 + 1, point.1));
+			if point.1 < self.height - 1 {
+				neighbors.push((point.0 + 1, point.1 + 1));
+			}
+		}
+		neighbors
+	}
+	fn heuristic(&self, point: Point, goal: Point) -> usize {
 		let diff_0 = if goal.0 > point.0 {
 			goal.0 - point.0
 		} else {
@@ -167,4 +162,34 @@ pub fn moore_heuristic(goal: Point) -> impl Fn(Point) -> usize {
 		};
 		diff_0.max(diff_1)
 	}
+}
+
+#[test]
+fn test_manhattan_get_all_neighbors() {
+	let neighborhood = ManhattanNeighborhood::new(5, 5);
+	assert_eq!(
+		neighborhood.get_all_neighbors((0, 2)),
+		vec![(1, 2), (0, 1), (0, 3)],
+	);
+}
+
+#[test]
+fn test_manhattan_heuristic() {
+	let neighborhood = ManhattanNeighborhood::new(5, 5);
+	assert_eq!(neighborhood.heuristic((3, 1), (0, 0)), 3 + 1);
+}
+
+#[test]
+fn test_moore_get_all_neighbors() {
+	let neighborhood = MooreNeighborhood::new(5, 5);
+	assert_eq!(
+		neighborhood.get_all_neighbors((0, 2)),
+		vec![(0, 1), (0, 3), (1, 1), (1, 2), (1, 3)],
+	);
+}
+
+#[test]
+fn test_moore_heuristic() {
+	let neighborhood = MooreNeighborhood::new(5, 5);
+	assert_eq!(neighborhood.heuristic((3, 1), (0, 0)), 3);
 }

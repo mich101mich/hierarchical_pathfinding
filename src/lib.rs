@@ -26,7 +26,7 @@
 //! between two points can then use that knowledge by treating the Grid as a Graph with Entrances
 //! as Nodes and the cached costs (and Paths) as Edges, resulting in a much smaller Graph that
 //! can be easily searched.
-//! 
+//!
 //! Since the Graph is usually not an exact representation of the Grid, **the resulting Paths will
 //! be slightly worse than the actual best Path**. This is usually not a problem, since the
 //! purpose of Hierarchical Pathfinding is to quickly find the next direction to go in or a
@@ -42,7 +42,7 @@
 //! ## Examples
 //! Creating the Cache:
 //! ```
-//! use hierarchical_pathfinding::PathCache;
+//! use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
 //!
 //! // create and initialize Grid
 //! // 0 = empty, 1 = swamp, 2 = wall
@@ -64,6 +64,7 @@
 //! let mut pathfinding = PathCache::new(
 //!     (width, height), // the size of the Grid
 //!     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//!     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //!     Default::default(), // other options for creating the cache
 //! );
 //! ```
@@ -82,7 +83,7 @@
 //! ### Pathfinding
 //! Finding the Path to a single Goal:
 //! ```
-//! # use hierarchical_pathfinding::PathCache;
+//! # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -104,20 +105,17 @@
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
 //! #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //! #     Default::default(), // other options for creating the cache
 //! # );
 //! #
 //! let start = (0, 0);
 //! let goal = (4, 4);
 //!
-//! use hierarchical_pathfinding::neighbors::*;
-//!
 //! // find_path returns Some(Path) on success
 //! let path = pathfinding.find_path(
 //!     start,
 //!     goal,
-//!     manhattan_neighbors(width, height), // get_all_neighbors
-//!     manhattan_heuristic(goal), // heuristic
 //!     |(x, y)| cost_map[grid[x][y]], // cost function
 //! );
 //!
@@ -128,7 +126,7 @@
 //!
 //! Finding multiple Goals:
 //! ```
-//! # use hierarchical_pathfinding::PathCache;
+//! # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -150,6 +148,7 @@
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
 //! #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //! #     Default::default(), // other options for creating the cache
 //! # );
 //! #
@@ -160,7 +159,6 @@
 //! let paths = pathfinding.find_paths(
 //!     start,
 //!     goals,
-//!     manhattan_neighbors(width, height), // get_all_neighbors
 //!     |(x, y)| cost_map[grid[x][y]], // cost function
 //! );
 //!
@@ -174,7 +172,7 @@
 //! This means however, that the user is responsible for storing and maintaining both the Grid and the PathCache.
 //! It is also necessary to update the PathCache when the Grid has changed to keep it consistent:
 //! ```
-//! # use hierarchical_pathfinding::PathCache;
+//! # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -196,6 +194,7 @@
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
 //! #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //! #     Default::default(), // other options for creating the cache
 //! # );
 //! #
@@ -203,7 +202,7 @@
 //! grid[4][4] = 2;
 //!
 //! pathfinding.tiles_changed(
-//!     &[(3, 1), (4, 4)]
+//!     &[(3, 1), (4, 4)],
 //!     |(x, y)| cost_map[grid[x][y]], // cost function
 //! );
 //! ```
@@ -214,7 +213,7 @@
 //! The PathCacheConfig struct also provides defaults for low Memory Usage [PathCacheConfig::LOW_MEM](struct.PathCacheConfig.html#associatedconstant.LOW_MEM)
 //! or best Performance [PathCacheConfig::HIGH_PERFORMANCE](struct.PathCacheConfig.html#associatedconstant.HIGH_PERFORMANCE)
 //! ```
-//! use hierarchical_pathfinding::{PathCache, PathCacheConfig};
+//! use hierarchical_pathfinding::{PathCache, PathCacheConfig, neighbors::ManhattanNeighborhood};
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -232,17 +231,18 @@
 //! #     5,  // swamp
 //! #     -1, // wall = solid
 //! # ];
-//! #
+//!
 //! let mut pathfinding = PathCache::new(
 //!     (width, height), // the size of the Grid
 //!     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//!     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //!     PathCacheConfig {
 //!         chunk_size: 5,
 //!         ..PathCacheConfig::LOW_MEM
 //!     }
 //! );
 //!
-//! assert_eq!(pathfinding.chunk_size(), 5);
+//! assert_eq!(pathfinding.get_config().chunk_size, 5);
 //! ```
 
 /// The Type used to reference a Node in the abstracted Graph

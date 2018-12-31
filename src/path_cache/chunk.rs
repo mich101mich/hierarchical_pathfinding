@@ -1,5 +1,5 @@
 use super::NodeMap;
-use crate::{NodeID, Point};
+use crate::{neighbors::Neighborhood, NodeID, Point};
 use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
@@ -9,10 +9,11 @@ pub struct Chunk {
 }
 
 impl Chunk {
-	pub fn new(
+	pub fn new<N: Neighborhood>(
 		pos: Point,
 		size: (usize, usize),
 		get_cost: impl Fn(Point) -> isize,
+		neighborhood: &N,
 		all_nodes: &mut NodeMap,
 	) -> Chunk {
 		let mut nodes = HashSet::new();

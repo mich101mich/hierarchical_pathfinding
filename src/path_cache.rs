@@ -1,4 +1,4 @@
-use crate::{NodeID, Point};
+use crate::{neighbors::Neighborhood, NodeID, Point};
 
 mod chunk;
 use self::chunk::Chunk;
@@ -17,26 +17,28 @@ use self::node_map::NodeMap;
 
 /// A struct to store the Hierarchical Pathfinding information.
 #[derive(Clone, Debug)]
-pub struct PathCache {
+pub struct PathCache<N: Neighborhood> {
 	width: usize,
 	height: usize,
 	chunks: Vec<Vec<Chunk>>,
 	nodes: NodeMap,
+	neighborhood: N,
 	config: PathCacheConfig,
 }
 
-impl PathCache {
+impl<N: Neighborhood> PathCache<N> {
 	/// creates a new PathCache
 	///
 	/// ## Arguments
 	/// - ```(width, height)```  the size of the Grid
 	/// - ```get_cost```  get the cost for walking over a tile. (Cost < 0 => solid Tile)
+	/// - ```neighborhood```  the Neighborhood to use. (See [Neighborhood](neighbors/trait.Neighborhood.html))
 	/// - ```config```  optional config for creating the cache
 	///
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// use hierarchical_pathfinding::PathCache;
+	/// use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
 	///
 	/// // create and initialize Grid
 	/// // 0 = empty, 1 = swamp, 2 = wall
@@ -58,14 +60,16 @@ impl PathCache {
 	/// let mut pathfinding = PathCache::new(
 	///     (width, height), // the size of the Grid
 	///     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+	///     ManhattanNeighborhood::new(width, height), // the Neighborhood
 	///     Default::default(), // other options for creating the cache
 	/// );
 	/// ```
 	pub fn new(
 		(width, height): (usize, usize),
 		get_cost: impl Fn(Point) -> isize,
+		neighborhood: N,
 		config: PathCacheConfig,
-	) -> PathCache {
+	) -> PathCache<N> {
 		let chunk_hor = {
 			let mut w = width / config.chunk_size;
 			if w * config.chunk_size < width {
@@ -102,6 +106,7 @@ impl PathCache {
 					(x * config.chunk_size, y * config.chunk_size),
 					(w, h),
 					&get_cost,
+					&neighborhood,
 					&mut nodes,
 				))
 			}
@@ -117,6 +122,7 @@ impl PathCache {
 			chunks,
 			nodes,
 			config,
+			neighborhood,
 		}
 	}
 
@@ -142,7 +148,7 @@ impl PathCache {
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// # use hierarchical_pathfinding::PathCache;
+	/// # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
 	/// #
 	/// # // create and initialize Grid
 	/// # // 0 = empty, 1 = swamp, 2 = wall
@@ -164,33 +170,28 @@ impl PathCache {
 	/// # let mut pathfinding = PathCache::new(
 	/// #     (width, height), // the size of the Grid
 	/// #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+	/// #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 	/// #     Default::default(), // other options for creating the cache
 	/// # );
 	/// #
 	/// let start = (0, 0);
 	/// let goal = (4, 4);
 	///
-	/// use hierarchical_pathfinding::neighbors::*;
-	///
 	/// // find_path returns Some(Path) on success
 	/// let path = pathfinding.find_path(
 	///     start,
 	///     goal,
-	///     manhattan_neighbors(width, height), // get_all_neighbors
-	///     manhattan_heuristic(goal), // heuristic
 	///     |(x, y)| cost_map[grid[x][y]], // cost function
 	/// );
 	///
 	/// assert!(path.is_some());
 	/// ```
-	pub fn find_path<NeighborIter: Iterator<Item = Point>>(
+	pub fn find_path(
 		&mut self,
 		start: Point,
 		goal: Point,
-		get_all_neighbors: impl Fn(Point) -> NeighborIter,
-		heuristic: impl Fn(Point) -> usize,
 		get_cost: impl Fn(Point) -> isize,
-	) -> Option<AbstractPath> {
+	) -> Option<AbstractPath<N>> {
 		None
 	}
 }
