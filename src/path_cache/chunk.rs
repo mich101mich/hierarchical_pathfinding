@@ -1,6 +1,6 @@
 use super::NodeMap;
 use crate::{neighbors::Neighborhood, NodeID, Point};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug)]
 pub struct Chunk {
@@ -9,11 +9,11 @@ pub struct Chunk {
 }
 
 impl Chunk {
-	pub fn new<N: Neighborhood>(
+	pub fn new(
 		pos: Point,
 		size: (usize, usize),
 		get_cost: impl Fn(Point) -> isize,
-		neighborhood: &N,
+		neighborhood: &impl Neighborhood,
 		all_nodes: &mut NodeMap,
 	) -> Chunk {
 		let mut nodes = HashSet::new();
@@ -25,9 +25,40 @@ impl Chunk {
 			}
 		}
 
-		// TODO: connect nodes
+		let chunk = Chunk { pos, nodes };
 
-		Chunk { pos, nodes }
+		let mut to_visit = chunk.nodes.iter().cloned().collect::<Vec<_>>();
+		let mut points = to_visit
+			.iter()
+			.map(|id| all_nodes[id].pos)
+			.collect::<Vec<_>>();
+
+		// connect every Node to every other Node
+		while let Some(id) = to_visit.pop() {
+			if to_visit.is_empty() {
+				break;
+			}
+			let point = points.pop().unwrap();
+			let paths = chunk.find_paths(point, &points, &get_cost, neighborhood);
+			for (other, path) in paths {
+				let other_id = *to_visit
+					.iter()
+					.find(|id| all_nodes[id].pos == other)
+					.unwrap();
+				let other_path = path.reversed(
+					get_cost(path[0]) as usize,
+					get_cost(*path.last().unwrap()) as usize,
+				);
+
+				let node = all_nodes.get_mut(&id).unwrap();
+				node.edges.insert(other_id, path);
+
+				let node = all_nodes.get_mut(&other_id).unwrap();
+				node.edges.insert(id, other_path);
+			}
+		}
+
+		chunk
 	}
 
 	fn calculate_side_nodes(
@@ -125,6 +156,41 @@ impl Chunk {
 			current = get_in_dir(current, next_dir, size).unwrap();
 		}
 		my_nodes
+	}
+
+	#[allow(dead_code)]
+	pub fn find_paths(
+		&self,
+		start: Point,
+		goals: &[Point],
+		get_cost: impl Fn(Point) -> isize,
+		neighborhood: &impl Neighborhood,
+	) -> HashMap<Point, crate::generics::Path<Point>> {
+		crate::generics::dijkstra_search(
+			|p| neighborhood.get_all_neighbors(p),
+			|p, _| get_cost(p) as usize,
+			|p| get_cost(p) < 0,
+			start,
+			goals,
+		)
+	}
+
+	#[allow(dead_code)]
+	pub fn find_path(
+		&self,
+		start: Point,
+		goal: Point,
+		get_cost: impl Fn(Point) -> isize,
+		neighborhood: &impl Neighborhood,
+	) -> Option<crate::generics::Path<Point>> {
+		crate::generics::a_star_search(
+			|p| neighborhood.get_all_neighbors(p),
+			|p, _| get_cost(p) as usize,
+			|p| get_cost(p) < 0,
+			start,
+			goal,
+			|p| neighborhood.heuristic(p, goal),
+		)
 	}
 }
 

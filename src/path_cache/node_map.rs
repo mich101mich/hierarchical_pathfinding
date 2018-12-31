@@ -25,10 +25,15 @@ impl NodeMap {
 	}
 }
 
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 impl Deref for NodeMap {
 	type Target = HashMap<NodeID, Node>;
 	fn deref(&self) -> &HashMap<NodeID, Node> {
 		&self.nodes
+	}
+}
+impl DerefMut for NodeMap {
+	fn deref_mut(&mut self) -> &mut HashMap<NodeID, Node> {
+		&mut self.nodes
 	}
 }

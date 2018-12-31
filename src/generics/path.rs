@@ -19,7 +19,7 @@ impl<P> Path<P> {
 	/// ```
 	/// # use hierarchical_pathfinding::generics::Path;
 	/// let path = Path::new(vec!['a', 'b', 'c'], 42);
-	/// 
+	///
 	/// assert_eq!(path.path, vec!['a', 'b', 'c']);
 	/// assert_eq!(path.cost, 42);
 	/// ```
@@ -42,6 +42,29 @@ impl<P> Path<P> {
 		self.path.push(node);
 		self.cost += cost;
 		self
+	}
+
+	/// Returns a reversed copy of the Path.
+	/// 
+	/// ```start_cost``` is what need to be subtracted, and ```end_cost``` is what needs to be
+	/// added to the cost in the case of asymmetric paths. Can be set to 0 for symmetric paths. 
+	/// ## Examples
+	/// Basic usage:
+	/// ```
+	/// # use hierarchical_pathfinding::generics::Path;
+	/// let path = Path::new(vec!['a', 'b', 'c'], 42);
+	/// let reversed = path.reversed(5, 2);
+	///
+	/// assert_eq!(reversed.path, vec!['c', 'b', 'a']);
+	/// assert_eq!(reversed.cost, 39);
+	/// ```
+	pub fn reversed(&self, start_cost: Cost, end_cost: Cost) -> Path<P>
+	where
+		P: Clone,
+	{
+		let mut path = self.path.clone();
+		path.reverse();
+		Path::new(path, self.cost - start_cost + end_cost)
 	}
 }
 

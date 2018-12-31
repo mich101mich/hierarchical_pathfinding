@@ -39,6 +39,7 @@ use std::hash::Hash;
 /// 			.enumerate()
 /// 			.filter(|&(_, cost)| *cost != -1)
 /// 			.map(|(id, _)| id)
+/// 			.collect()
 /// 	},
 /// 	|a, b| cost_matrix[a][b] as usize, // get_cost
 /// 	|_| true, // is_walkable
@@ -49,11 +50,11 @@ use std::hash::Hash;
 ///
 /// assert!(result.is_some());
 /// let path = result.unwrap();
-/// 
+///
 /// assert_eq!(path.path, vec![A, C, D]);
 /// assert_eq!(path.cost, 7);
 /// ```
-/// 
+///
 /// If the Goal cannot be reached, None is returned:
 /// ```
 /// # use hierarchical_pathfinding::generics::a_star_search;
@@ -77,6 +78,7 @@ use std::hash::Hash;
 /// #            .enumerate()
 /// #            .filter(|&(_, cost)| *cost != -1)
 /// #            .map(|(id, _)| id)
+/// #            .collect()
 /// #    },
 /// #    |a, b| cost_matrix[a][b] as usize, // get_cost
 /// #    |_| true, // is_walkable
@@ -106,18 +108,14 @@ use std::hash::Hash;
 /// ## Returns
 /// the Path, if one was found, or None if the ```goal``` is unreachable.
 /// The first Node in the Path is always the ```start``` and the last is the ```goal```
-pub fn a_star_search<Id, NeighborIter>(
-	get_all_neighbors: impl Fn(Id) -> NeighborIter,
+pub fn a_star_search<Id: Copy + Eq + Hash>(
+	get_all_neighbors: impl Fn(Id) -> Vec<Id>,
 	get_cost: impl Fn(Id, Id) -> Cost,
 	is_walkable: impl Fn(Id) -> bool,
 	start: Id,
 	goal: Id,
 	heuristic: impl Fn(Id) -> Cost,
-) -> Option<Path<Id>>
-where
-	Id: Copy + Eq + Hash,
-	NeighborIter: Iterator<Item = Id>,
-{
+) -> Option<Path<Id>> {
 	if start == goal {
 		return Some(Path::new(vec![start, start], 0));
 	}

@@ -7,7 +7,7 @@ use std::hash::Hash;
 /// The Generic type Parameter ```Id``` is supposed to uniquely identify a Node in the Graph.
 /// This may be a Number, String, a Grid position, ... as long as it can be compared, hashed and copied.
 /// Note that it is advised to choose a short representation for the Id, since it will be copied several times.
-/// 
+///
 /// This function can be used to search for several Goals and will try to calculate a Path for every provided Goal.
 /// It stops as soon as it has the shortest Path to every Goal, or when all reachable Nodes have been expanded.
 ///
@@ -39,6 +39,7 @@ use std::hash::Hash;
 /// 			.enumerate()
 /// 			.filter(|&(_, cost)| *cost != -1)
 /// 			.map(|(id, _)| id)
+/// 			.collect()
 /// 	},
 /// 	|a, b| cost_matrix[a][b] as usize, // get_cost
 /// 	|_| true, // is_walkable
@@ -72,17 +73,13 @@ use std::hash::Hash;
 /// ## Returns
 /// a HashMap with all reachable Goal's Ids as the Key and the shortest Path to reach that Goal as Value.
 /// The first Node in the Path is always the ```start``` and the last is the corresponding Goal
-pub fn dijkstra_search<Id, NeighborIter>(
-	get_all_neighbors: impl Fn(Id) -> NeighborIter,
+pub fn dijkstra_search<Id: Copy + Eq + Hash>(
+	get_all_neighbors: impl Fn(Id) -> Vec<Id>,
 	get_cost: impl Fn(Id, Id) -> Cost,
 	is_walkable: impl Fn(Id) -> bool,
 	start: Id,
 	goals: &[Id],
-) -> HashMap<Id, Path<Id>>
-where
-	Id: Copy + Eq + Hash,
-	NeighborIter: Iterator<Item = Id>,
-{
+) -> HashMap<Id, Path<Id>> {
 	let mut visited = ::std::collections::HashMap::new();
 	let mut next = vec![(start, 0)];
 	visited.insert(start, (0, start));

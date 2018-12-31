@@ -3,9 +3,9 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct Node {
-	id: NodeID,
-	pos: Point,
-	edges: HashMap<NodeID, Path<NodeID>>,
+	pub id: NodeID,
+	pub pos: Point,
+	pub edges: HashMap<NodeID, Path<Point>>,
 }
 
 impl Node {

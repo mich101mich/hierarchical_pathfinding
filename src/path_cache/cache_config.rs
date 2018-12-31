@@ -87,7 +87,7 @@ impl PathCacheConfig {
 	/// 		a_star_fallback: false,
 	/// 		perfect_paths: false,
 	/// 	},
-	/// 	PathCacheConfig::LOW_MEM
+	/// 	PathCacheConfig::HIGH_PERFORMANCE
 	/// );
 	/// ```
 	pub const HIGH_PERFORMANCE: PathCacheConfig = PathCacheConfig {
