@@ -11,7 +11,7 @@
 	unused_qualifications
 )]
 
-//! A crate to find Paths on a Grid using HPA* (Hierarchical Pathfinding A*) and Hierarchical Dijkstra.
+//! A crate to quickly approximate Paths on a Grid.
 //!
 //! ## Introduction
 //! Finding Paths on a Grid using regular A* and Dijkstra is usually a rather expensive Operation,
