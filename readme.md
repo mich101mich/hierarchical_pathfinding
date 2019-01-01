@@ -26,7 +26,7 @@ purpose of Hierarchical Pathfinding is to quickly find the next direction to go 
 Heuristic for the total Cost of a Path or to determine weather or not a Goal is reachable.
 All of these are not affected by the exact Cost or Path. The only time where the actual best
 Path would noticeably differ from this crates result is in the case of small Paths of
-```Length < 2 * chunk_size```. That is why this implementation calls the regular A* search
+`Length < 2 * chunk_size`. That is why this implementation calls the regular A* search
 after HPA* confirmed the Path to be short. (This behavior can be turned of using the Config).
 
 This crate provides an implementation of a Hierarchical Pathfinding Algorithm for any generic Grid.

@@ -2,9 +2,10 @@ use super::Cost;
 
 /// A generic implementation of a Path
 ///
-/// Stores a sequence of Nodes in ```path``` and the total Cost of traversing these Nodes in ```cost```.
+/// Stores a sequence of Nodes in `path` and the total Cost of traversing these Nodes in `cost`.
 /// Note that the individual costs of the steps within the Path cannot be retrieved through this struct.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(missing_doc_code_examples)]
 pub struct Path<P> {
 	/// the Path
 	pub path: Vec<P>,
@@ -46,7 +47,7 @@ impl<P> Path<P> {
 
 	/// Returns a reversed copy of the Path.
 	/// 
-	/// ```start_cost``` is what need to be subtracted, and ```end_cost``` is what needs to be
+	/// `start_cost` is what need to be subtracted, and `end_cost` is what needs to be
 	/// added to the cost in the case of asymmetric paths. Can be set to 0 for symmetric paths. 
 	/// ## Examples
 	/// Basic usage:

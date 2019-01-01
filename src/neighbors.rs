@@ -13,9 +13,9 @@ use crate::Point;
 /// a goal from a Point.
 ///
 /// The most common implementations of this Trait are already provided by this Module:
-/// - [```ManhattanNeighborhood```](struct.ManhattanNeighborhood.html) for Agents that can move
+/// - [`ManhattanNeighborhood`] for Agents that can move
 /// up, down, left or right
-/// - [```MooreNeighborhood```](struct.MooreNeighborhood.html) for Agents that can move
+/// - [`MooreNeighborhood`] for Agents that can move
 /// up, down, left, right, as well as the 4 diagonals (up-right, ...)
 pub trait Neighborhood {
 	/// Provides a list of Neighbors of a Point
@@ -23,7 +23,7 @@ pub trait Neighborhood {
 	/// Note that it is not necessary to check weather the Tile at a Point is solid or not.
 	/// That check is done later.
 	fn get_all_neighbors(&self, point: Point) -> Vec<Point>;
-	/// Gives a Heuristic for how long it takes to reach ```goal``` from ```point```.
+	/// Gives a Heuristic for how long it takes to reach `goal` from `point`.
 	///
 	/// This is usually the Distance between the two Points in the Metric of your Neighborhood.
 	///
@@ -54,7 +54,7 @@ pub struct ManhattanNeighborhood {
 impl ManhattanNeighborhood {
 	/// Creates a new ManhattanNeighborhood.
 	///
-	/// ```width``` and ```height``` are the size of the Grid to move on.
+	/// `width` and `height` are the size of the Grid to move on.
 	pub fn new(width: usize, height: usize) -> ManhattanNeighborhood {
 		ManhattanNeighborhood { width, height }
 	}
@@ -114,7 +114,7 @@ pub struct MooreNeighborhood {
 impl MooreNeighborhood {
 	/// Creates a new MooreNeighborhood.
 	///
-	/// ```width``` and ```height``` are the size of the Grid to move on.
+	/// `width` and `height` are the size of the Grid to move on.
 	pub fn new(width: usize, height: usize) -> MooreNeighborhood {
 		MooreNeighborhood { width, height }
 	}

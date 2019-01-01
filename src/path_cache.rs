@@ -30,10 +30,10 @@ impl<N: Neighborhood> PathCache<N> {
 	/// creates a new PathCache
 	///
 	/// ## Arguments
-	/// - ```(width, height)```  the size of the Grid
-	/// - ```get_cost```  get the cost for walking over a tile. (Cost < 0 => solid Tile)
-	/// - ```neighborhood```  the Neighborhood to use. (See [Neighborhood](neighbors/trait.Neighborhood.html))
-	/// - ```config```  optional config for creating the cache
+	/// - `(width, height)` - the size of the Grid
+	/// - `get_cost` - get the cost for walking over a tile. (Cost < 0 => solid Tile)
+	/// - `neighborhood` - the Neighborhood to use. (See [`Neighborhood`])
+	/// - `config` - optional config for creating the cache
 	///
 	/// ## Examples
 	/// Basic usage:
@@ -149,24 +149,18 @@ impl<N: Neighborhood> PathCache<N> {
 		}
 	}
 
-	/// Calculates the Path from ```start``` to ```goal``` on the Grid.
+	/// Calculates the Path from `start` to `goal` on the Grid.
 	///
 	/// If no Path could be found, None is returned.
 	///
-	/// This function takes a mutable reference of self, because ```start``` and ```goal``` need to be inserted into
+	/// This function takes a mutable reference of self, because `start` and `goal` need to be inserted into
 	/// the Abstract Graph in order for the algorithm to work. They are removed at the end unless
-	/// ```keep_insertions``` of PathCacheConfig was set to true (default) when creating the PathCache.
+	/// `keep_insertions` of PathCacheConfig was set to true (default) when creating the PathCache.
 	///
 	/// ## Arguments
-	/// - ```start```  the Point where the search starts
-	/// - ```goal```  the Point to search for. This may be a solid wall.
-	/// - ```get_all_neighbors```  a function that takes a Point and returns all neighbors according to the
-	/// desired Neighborhood, including solid Tiles, if solid Goals are supposed to be searchable.
-	/// See the [neighbors crate](neighbors/index.html) for example functions.
-	/// - ```heuristic```  The Heuristic to use while searching. This is usually just the Distance between a Point and the Goal
-	/// (see the [neighbors crate](neighbors/index.html)), but it is possible to supply a better Heuristic or just return 0 for
-	/// every Point. A better Heuristic greatly improves the speed of the search.
-	/// - ```get_cost```  get the cost for walking over a tile. (Cost < 0 => solid Tile)
+	/// - `start`  the Point where the search starts
+	/// - `goal`  the Point to search for. This may be a solid wall.
+	/// - `get_cost`  get the cost for walking over a tile. (Cost < 0 => solid Tile)
 	///
 	/// ## Examples
 	/// Basic usage:

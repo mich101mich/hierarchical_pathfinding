@@ -1,6 +1,6 @@
 #![warn(
     missing_docs,
-    missing_doc_code_examples,
+    // missing_doc_code_examples,
     missing_debug_implementations,
     missing_copy_implementations,
     trivial_casts,
@@ -33,7 +33,7 @@
 //! Heuristic for the total Cost of a Path or to determine weather or not a Goal is reachable.
 //! All of these are not affected by the exact Cost or Path. The only time where the actual best
 //! Path would noticeably differ from this crates result is in the case of small Paths of
-//! ```Length < 2 * chunk_size```. That is why this implementation calls the regular A* search
+//! `Length < 2 * chunk_size`. That is why this implementation calls the regular A* search
 //! after HPA* confirmed the Path to be short. (This behavior can be turned of using the Config).
 //!
 //! This crate provides an implementation of a Hierarchical Pathfinding Algorithm for any generic Grid.
@@ -179,7 +179,7 @@
 //! and minimize lost time when the surroundings change in a way that alters the Path.
 //! That is why it does not calculate the full Path immediately. It does, however, generate
 //! the first steps of the Path without too much overhead. That is why it is advised to
-//! mostly use the ```next()``` method of the returned Path for a few steps.
+//! mostly use the `next()` method of the returned Path for a few steps.
 //!
 //! ```
 //! # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
@@ -274,10 +274,10 @@
 //! ```
 //!
 //! ### Configuration
-//! The last parameter for PathCache::new is a [PathCacheConfig](struct.PathCacheConfig.html) object with different options to have more control over the generated PathCache.
+//! The last parameter for PathCache::new is a [`PathCacheConfig`] object with different options to have more control over the generated PathCache.
 //! These options are mostly used to adjust the balance between Performance and Memory Usage, with the default values aiming more at Performance.
-//! The PathCacheConfig struct also provides defaults for low Memory Usage [PathCacheConfig::LOW_MEM](struct.PathCacheConfig.html#associatedconstant.LOW_MEM)
-//! or best Performance [PathCacheConfig::HIGH_PERFORMANCE](struct.PathCacheConfig.html#associatedconstant.HIGH_PERFORMANCE)
+//! The PathCacheConfig struct also provides defaults for low Memory Usage [`PathCacheConfig::LOW_MEM`]
+//! or best Performance [`PathCacheConfig::HIGH_PERFORMANCE`]
 //! ```
 //! use hierarchical_pathfinding::{PathCache, PathCacheConfig, neighbors::ManhattanNeighborhood};
 //! #
@@ -307,7 +307,7 @@
 //!         ..PathCacheConfig::LOW_MEM
 //!     }
 //! );
-//! 
+//!
 //! // TODO: test things
 //!
 //! ```

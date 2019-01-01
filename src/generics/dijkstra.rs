@@ -4,7 +4,7 @@ use std::hash::Hash;
 
 /// Searches a Graph using [Dijkstra's Algorithm](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm).
 ///
-/// The Generic type Parameter ```Id``` is supposed to uniquely identify a Node in the Graph.
+/// The Generic type Parameter `Id` is supposed to uniquely identify a Node in the Graph.
 /// This may be a Number, String, a Grid position, ... as long as it can be compared, hashed and copied.
 /// Note that it is advised to choose a short representation for the Id, since it will be copied several times.
 ///
@@ -59,20 +59,20 @@ use std::hash::Hash;
 ///
 /// ## Solid Goals
 /// It is possible to calculate the shortest Path to for example a Wall and other non-walkable Nodes using this function.
-/// To do that, simply supply a Function to the is_walkable Parameter that returns ```false``` for Nodes that
+/// To do that, simply supply a Function to the `is_walkable` Parameter that returns `false` for Nodes that
 /// should not be used as part of an actual Path. If there are no such Nodes in the Graph,
-/// is_walkable may simply be set to ```|_| true```
+/// is_walkable may simply be set to `|_| true`
 ///
 /// ## Arguments
-/// - ```get_all_neighbors``` - a Function that takes a Node and returns all other Nodes reachable from that Node. It is only invoked once for every expanded Node.
-/// - ```get_cost``` - a Function that takes two Nodes (a, b) and returns the Cost to go from a to b
-/// - ```is_walkable``` - a Function that determines if a Node can be walked over. see [Solid Goals](#solid-goals) for more info
-/// - ```start``` - the starting Node
-/// - ```goals``` - the Goals that this function is supposed to search for
+/// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node. It is only invoked once for every expanded Node.
+/// - `get_cost` - a Function that takes two Nodes (a, b) and returns the Cost to go from a to b
+/// - `is_walkable` - a Function that determines if a Node can be walked over. see [Solid Goals](#solid-goals) for more info
+/// - `start` - the starting Node
+/// - `goals` - the Goals that this function is supposed to search for
 ///
 /// ## Returns
 /// a HashMap with all reachable Goal's Ids as the Key and the shortest Path to reach that Goal as Value.
-/// The first Node in the Path is always the ```start``` and the last is the corresponding Goal
+/// The first Node in the Path is always the `start` and the last is the corresponding Goal
 pub fn dijkstra_search<Id: Copy + Eq + Hash>(
 	get_all_neighbors: impl Fn(Id) -> Vec<Id>,
 	get_cost: impl Fn(Id, Id) -> Cost,
