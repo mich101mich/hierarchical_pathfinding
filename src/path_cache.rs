@@ -59,7 +59,7 @@ impl<N: Neighborhood> PathCache<N> {
 	///
 	/// let mut pathfinding = PathCache::new(
 	///     (width, height), // the size of the Grid
-	///     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+	///     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
 	///     ManhattanNeighborhood::new(width, height), // the Neighborhood
 	///     Default::default(), // other options for creating the cache
 	/// );
@@ -192,7 +192,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #
 	/// # let mut pathfinding = PathCache::new(
 	/// #     (width, height), // the size of the Grid
-	/// #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+	/// #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
 	/// #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 	/// #     Default::default(), // other options for creating the cache
 	/// # );
@@ -204,7 +204,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// let path = pathfinding.find_path(
 	///     start,
 	///     goal,
-	///     |(x, y)| cost_map[grid[x][y]], // cost function
+	///     |(x, y)| cost_map[grid[y][x]], // cost function
 	/// );
 	///
 	/// assert!(path.is_some());

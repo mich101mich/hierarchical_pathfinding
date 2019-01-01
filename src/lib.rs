@@ -63,7 +63,7 @@
 //!
 //! let mut pathfinding = PathCache::new(
 //!     (width, height), // the size of the Grid
-//!     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//!     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
 //!     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //!     Default::default(), // other options for creating the cache
 //! );
@@ -104,7 +104,7 @@
 //! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //! #     Default::default(), // other options for creating the cache
 //! # );
@@ -116,7 +116,7 @@
 //! let path = pathfinding.find_path(
 //!     start,
 //!     goal,
-//!     |(x, y)| cost_map[grid[x][y]], // cost function
+//!     |(x, y)| cost_map[grid[y][x]], // cost function
 //! );
 //!
 //! assert!(path.is_some());
@@ -145,7 +145,7 @@
 //! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //! #     Default::default(), // other options for creating the cache
 //! # );
@@ -157,7 +157,7 @@
 //! let paths = pathfinding.find_paths(
 //!     start,
 //!     goals,
-//!     |(x, y)| cost_map[grid[x][y]], // cost function
+//!     |(x, y)| cost_map[grid[y][x]], // cost function
 //! );
 //!
 //! assert!(paths.contains_key(&goals[0]));
@@ -203,7 +203,7 @@
 //! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //! #     Default::default(), // other options for creating the cache
 //! # );
@@ -224,7 +224,7 @@
 //! let path = pathfinding.find_path(
 //!     player.pos,
 //!     goal,
-//!     |(x, y)| cost_map[grid[x][y]], // cost function
+//!     |(x, y)| cost_map[grid[y][x]], // cost function
 //! );
 //!
 //! if let Some(path) = path {
@@ -259,7 +259,7 @@
 //! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //! #     Default::default(), // other options for creating the cache
 //! # );
@@ -269,7 +269,7 @@
 //!
 //! pathfinding.tiles_changed(
 //!     &[(3, 1), (4, 4)],
-//!     |(x, y)| cost_map[grid[x][y]], // cost function
+//!     |(x, y)| cost_map[grid[y][x]], // cost function
 //! );
 //! ```
 //!
@@ -300,15 +300,16 @@
 //!
 //! let mut pathfinding = PathCache::new(
 //!     (width, height), // the size of the Grid
-//!     |(x, y)| cost_map[grid[x][y]], // get the cost for walking over a tile
+//!     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
 //!     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //!     PathCacheConfig {
-//!         chunk_size: 5,
+//!         chunk_size: 3,
 //!         ..PathCacheConfig::LOW_MEM
 //!     }
 //! );
+//! 
+//! // TODO: test things
 //!
-//! assert_eq!(pathfinding.get_config().chunk_size, 5);
 //! ```
 
 /// The Type used to reference a Node in the abstracted Graph

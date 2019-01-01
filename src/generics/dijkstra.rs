@@ -91,14 +91,18 @@ pub fn dijkstra_search<Id: Copy + Eq + Hash>(
 	while let Some((current_id, _)) = next.pop() {
 		let cost = visited[&current_id].0;
 
+		let mut found_one = false;
 		for &goal_id in remaining_goals.iter() {
 			if current_id == goal_id {
 				goal_costs.insert(goal_id, cost);
+				found_one = true;
 			}
 		}
-		remaining_goals.retain(|&id| id != current_id);
-		if remaining_goals.is_empty() {
-			break;
+		if found_one {
+			remaining_goals.retain(|&id| id != current_id);
+			if remaining_goals.is_empty() {
+				break;
+			}
 		}
 
 		for other_id in get_all_neighbors(current_id) {
