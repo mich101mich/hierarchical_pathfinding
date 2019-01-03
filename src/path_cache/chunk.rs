@@ -30,8 +30,12 @@ impl Chunk {
 		for dir in 0..4 {
 			Chunk::calculate_side_nodes(dir, pos, size, &get_cost, &mut candidates);
 		}
-		for p in candidates.into_iter().filter(|p| get_cost(*p) >= 0) {
-			nodes.insert(all_nodes.add_node(p));
+		for (p, cost) in candidates
+			.into_iter()
+			.map(|p| (p, get_cost(p)))
+			.filter(|(_, cost)| *cost >= 0)
+		{
+			nodes.insert(all_nodes.add_node(p, cost));
 		}
 
 		let chunk = Chunk { pos, size, nodes };
@@ -160,7 +164,7 @@ impl Chunk {
 		&self,
 		start: Point,
 		goals: &[Point],
-		get_cost: impl Fn(Point) -> isize,
+		get_cost: &Fn(Point) -> isize,
 		neighborhood: &impl Neighborhood,
 	) -> HashMap<Point, crate::generics::Path<Point>> {
 		crate::generics::dijkstra_search(
@@ -181,7 +185,7 @@ impl Chunk {
 		&self,
 		start: Point,
 		goal: Point,
-		get_cost: impl Fn(Point) -> isize,
+		get_cost: &Fn(Point) -> isize,
 		neighborhood: &impl Neighborhood,
 	) -> Option<crate::generics::Path<Point>> {
 		crate::generics::a_star_search(

@@ -32,9 +32,9 @@ pub struct PathCacheConfig {
 	/// Keeping Points slightly increases future search times and memory usage, but makes searches
 	/// to or from those same Points a lot faster.
 	pub keep_insertions: bool,
-	/// `true` (default): When a Path is short (`Length < 2 * chunk_size`), a regular A* search
-	/// is performed on the Grid **after** HPA* calculated a Path to confirmed the existence and
-	/// length.
+	/// `true` (default): When a Path is short (roughly `Length < 2 * chunk_size`), a regular
+	/// A* search is performed on the Grid **after** HPA* calculated a Path to confirm the
+	/// existence and length.
 	///
 	/// `false`: The Paths are left as they are.
 	///

@@ -1,5 +1,5 @@
 use super::Node;
-use crate::{NodeID, Point};
+use crate::{generics::Path, NodeID, Point};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -15,13 +15,30 @@ impl NodeMap {
 			next_id: 0,
 		}
 	}
-	pub fn add_node(&mut self, pos: Point) -> NodeID {
+
+	pub fn add_node(&mut self, pos: Point, walk_cost: isize) -> NodeID {
 		let id = self.next_id;
 		self.next_id += 1;
 
-		let node = Node::new(id, pos);
+		let node = Node::new(id, pos, walk_cost);
 		self.nodes.insert(id, node);
 		id
+	}
+
+	pub fn add_edge(&mut self, src: NodeID, target: NodeID, path: Path<Point>) {
+		let src_cost = self[&src].walk_cost;
+		let target_cost = self[&target].walk_cost;
+
+		assert!(src_cost >= 0, "Cannot add Path from solid Node");
+
+		if target_cost >= 0 {
+			let other_path = path.reversed(src_cost as usize, target_cost as usize);
+			let node = self.get_mut(&target).unwrap();
+			node.edges.insert(src, other_path);
+		}
+
+		let node = self.get_mut(&src).unwrap();
+		node.edges.insert(target, path);
 	}
 }
 

@@ -17,7 +17,7 @@ use crate::Point;
 /// up, down, left or right
 /// - [`MooreNeighborhood`] for Agents that can move
 /// up, down, left, right, as well as the 4 diagonals (up-right, ...)
-pub trait Neighborhood {
+pub trait Neighborhood : Clone {
 	/// Provides a list of Neighbors of a Point
 	///
 	/// Note that it is not necessary to check weather the Tile at a Point is solid or not.

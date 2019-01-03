@@ -42,7 +42,7 @@
 //! ## Examples
 //! Creating the Cache:
 //! ```
-//! use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
+//! use hierarchical_pathfinding::prelude::*;
 //!
 //! // create and initialize Grid
 //! // 0 = empty, 1 = swamp, 2 = wall
@@ -57,15 +57,15 @@
 //!
 //! let cost_map = [
 //!     1,  // empty
-//!     5,  // swamp
+//!     10, // swamp
 //!     -1, // wall = solid
 //! ];
 //!
 //! let mut pathfinding = PathCache::new(
 //!     (width, height), // the size of the Grid
-//!     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
+//!     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
 //!     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//!     Default::default(), // other options for creating the cache
+//!     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
 //! );
 //! ```
 //! Note that the PathCache never actually asks for the Grid itself. This allows the user to
@@ -83,7 +83,7 @@
 //! ### Pathfinding
 //! Finding the Path to a single Goal:
 //! ```
-//! # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
+//! # use hierarchical_pathfinding::prelude::*;
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -98,15 +98,15 @@
 //! #
 //! # let cost_map = [
 //! #     1,  // empty
-//! #     5,  // swamp
+//! #     10, // swamp
 //! #     -1, // wall = solid
 //! # ];
 //! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
+//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     Default::default(), // other options for creating the cache
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
 //! # );
 //! #
 //! let start = (0, 0);
@@ -120,11 +120,15 @@
 //! );
 //!
 //! assert!(path.is_some());
+//! let path = path.unwrap();
+//!
+//! assert_eq!(path.cost(), 12);
 //! ```
+//! For more information, see [`find_path`](PathCache::find_path).
 //!
 //! Finding multiple Goals:
 //! ```
-//! # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
+//! # use hierarchical_pathfinding::prelude::*;
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -139,15 +143,15 @@
 //! #
 //! # let cost_map = [
 //! #     1,  // empty
-//! #     5,  // swamp
+//! #     10, // swamp
 //! #     -1, // wall = solid
 //! # ];
 //! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
+//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     Default::default(), // other options for creating the cache
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
 //! # );
 //! #
 //! let start = (0, 0);
@@ -156,14 +160,16 @@
 //! // find_paths returns a HashMap<goal, Path> for all successes
 //! let paths = pathfinding.find_paths(
 //!     start,
-//!     goals,
+//!     &goals,
 //!     |(x, y)| cost_map[grid[y][x]], // cost function
 //! );
 //!
 //! assert!(paths.contains_key(&goals[0]));
+//! assert_eq!(paths[&goals[0]].cost, 12);
 //!
 //! assert!(!paths.contains_key(&goals[1]));
 //! ```
+//! For more information, see [`find_paths`](PathCache::find_paths).
 //!
 //! ### Using a Path
 //! The easiest information obtainable from a Path is its existence. Despite being an
@@ -182,7 +188,7 @@
 //! mostly use the `next()` method of the returned Path for a few steps.
 //!
 //! ```
-//! # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
+//! # use hierarchical_pathfinding::prelude::*;
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -197,15 +203,15 @@
 //! #
 //! # let cost_map = [
 //! #     1,  // empty
-//! #     5,  // swamp
+//! #     10, // swamp
 //! #     -1, // wall = solid
 //! # ];
 //! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
+//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     Default::default(), // other options for creating the cache
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
 //! # );
 //! # struct Player{ pos: (usize, usize) }
 //! # impl Player {
@@ -214,23 +220,27 @@
 //! #     }
 //! # }
 //! #
-//! let mut player = Player {
-//!     pos: (0, 0),
-//!     //...
-//! };
-//! let goal = (4, 4);
+//! # let mut player = Player {
+//! #     pos: (0, 0),
+//! #     //...
+//! # };
+//! # let goal = (4, 4);
+//! #
+//! # let path = pathfinding.find_path(
+//! #     player.pos,
+//! #     goal,
+//! #     |(x, y)| cost_map[grid[y][x]], // cost function
+//! # );
+//! // ...
+//! let mut path = path.unwrap();
 //!
-//! // find_path returns Some(Path) on success
-//! let path = pathfinding.find_path(
-//!     player.pos,
-//!     goal,
-//!     |(x, y)| cost_map[grid[y][x]], // cost function
-//! );
-//!
-//! if let Some(path) = path {
-//!     player.move_to(path.next().unwrap());
-//! }
+//! player.move_to(path.next().unwrap());
 //! assert_eq!(player.pos, (0, 1));
+//!
+//! // wait
+//!
+//! player.move_to(path.next().unwrap());
+//! assert_eq!(player.pos, (0, 2));
 //! ```
 //!
 //! ### Updating the PathCache
@@ -253,15 +263,15 @@
 //! #
 //! # let cost_map = [
 //! #     1,  // empty
-//! #     5,  // swamp
+//! #     10, // swamp
 //! #     -1, // wall = solid
 //! # ];
 //! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
+//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     Default::default(), // other options for creating the cache
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
 //! # );
 //! #
 //! grid[3][1] = 0;
@@ -294,13 +304,13 @@
 //! #
 //! # let cost_map = [
 //! #     1,  // empty
-//! #     5,  // swamp
+//! #     10, // swamp
 //! #     -1, // wall = solid
 //! # ];
 //!
 //! let mut pathfinding = PathCache::new(
 //!     (width, height), // the size of the Grid
-//!     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a tile
+//!     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
 //!     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //!     PathCacheConfig {
 //!         chunk_size: 3,
@@ -308,8 +318,7 @@
 //!     }
 //! );
 //!
-//! // TODO: test things
-//!
+//! assert!(false, "we don't test anything here :/");
 //! ```
 
 /// The Type used to reference a Node in the abstracted Graph
@@ -324,3 +333,11 @@ pub use self::path_cache::{AbstractPath, PathCache, PathCacheConfig};
 pub mod neighbors;
 
 pub mod generics;
+
+/// The prelude for this crate.
+pub mod prelude {
+    pub use crate::{
+        neighbors::{ManhattanNeighborhood, MooreNeighborhood, Neighborhood},
+        AbstractPath, PathCache, PathCacheConfig,
+    };
+}
