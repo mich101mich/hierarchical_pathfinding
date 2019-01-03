@@ -268,7 +268,7 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 	///
 	/// player.move_to(path.next().unwrap());
 	/// assert_eq!(player.pos, (0, 1));
-	/// 
+	///
 	/// // wait for next turn or whatever
 	///
 	/// player.move_to(path.next().unwrap());
@@ -356,16 +356,42 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 			|id| self.neighborhood.heuristic(self.nodes[&id].pos, goal),
 		);
 
-		path.map(|path| {
-			let mut ret = AbstractPathImpl::<N>::new(start);
+		if let Some(path) = path {
+			let length = if self.config.cache_paths {
+				path.windows(2)
+					.map(|ids| self.nodes[&ids[0]].edges[&ids[1]].len())
+					.sum()
+			} else {
+				path.cost
+			};
 
-			for ids in path.windows(2) {
-				let path = &self.nodes[&ids[0]].edges[&ids[1]];
-				ret.add_path(path.clone());
+			if self.config.a_star_fallback && length < 2 * self.config.chunk_size {
+				let path = generics::a_star_search(
+					|p| self.neighborhood.get_all_neighbors(p),
+					|p, _| get_cost(p) as usize,
+					|p| get_cost(p) >= 0,
+					start,
+					goal,
+					|p| self.neighborhood.heuristic(p, goal),
+				)
+				.expect("Internal Error in PathCache. Please report this");
+
+				Some(AbstractPathImpl::<N>::from_known_path(path))
+			} else {
+				let mut ret = AbstractPathImpl::<N>::new(start);
+				for ids in path.windows(2) {
+					let path = &self.nodes[&ids[0]].edges[&ids[1]];
+					if self.config.cache_paths {
+						ret.add_path(path.clone());
+					} else {
+						ret.add_node(self.nodes[&ids[1]].pos, path.cost);
+					}
+				}
+				Some(ret)
 			}
-
-			ret
-		})
+		} else {
+			None
+		}
 	}
 
 	/// Calculates the Paths from one `start` to several `goals` on the Grid.
