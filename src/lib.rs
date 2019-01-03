@@ -44,7 +44,7 @@
 //! ## Examples
 //! Creating the Cache:
 //! ```
-//! use hierarchical_pathfinding::prelude::*;
+//! use hierarchical_pathfinding::{prelude::*, Point};
 //!
 //! // create and initialize Grid
 //! // 0 = empty, 1 = swamp, 2 = wall
@@ -82,10 +82,57 @@
 //! Unfortunately, it is necessary to provide this function to every method of PathCache, since
 //! storing it would make the Grid immutable. See also [Updating the PathCache](#updating-the-pathcache).
 //!
+//! **Note**: If copying the Cost function everywhere would create too much Code / less readable
+//! code, [currying](https://en.wikipedia.org/wiki/Currying) may be used:
+//! ```
+//! # use hierarchical_pathfinding::{prelude::*, Point};
+//! #
+//! # // create and initialize Grid
+//! # // 0 = empty, 1 = swamp, 2 = wall
+//! # let mut grid = [
+//! #     [0, 2, 0, 0, 0],
+//! #     [0, 2, 2, 2, 0],
+//! #     [0, 1, 0, 0, 0],
+//! #     [0, 1, 0, 2, 0],
+//! #     [0, 0, 0, 2, 0],
+//! # ];
+//! # let (width, height) = (grid.len(), grid[0].len());
+//! #
+//! const COST_MAP: [isize; 3] = [1, 10, -1];
+//!
+//! // only references the Grid when called
+//! fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//!     move |(x, y)| COST_MAP[grid[y][x]]
+//! }
+//!
+//! let mut pathfinding = PathCache::new(
+//!     (width, height), // the size of the Grid
+//!
+//!     // simply call the creator function to take a reference of the Grid
+//!     cost_fn(&grid),
+//!
+//!     // ...
+//! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
+//! );
+//!
+//! # let start = (0, 0);
+//! # let goal = (4, 4);
+//! // ...
+//!
+//! let path = pathfinding.find_path(
+//!     start, goal,
+//!
+//!     // function can be reused at any time
+//!     cost_fn(&grid),
+//!
+//! );
+//! ```
+//!
 //! ### Pathfinding
 //! Finding the Path to a single Goal:
 //! ```
-//! # use hierarchical_pathfinding::prelude::*;
+//! # use hierarchical_pathfinding::{prelude::*, Point};
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -98,17 +145,17 @@
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
 //! #
-//! # let cost_map = [
-//! #     1,  // empty
-//! #     10, // swamp
-//! #     -1, // wall = solid
-//! # ];
+//! # const COST_MAP: [isize; 3] = [1, 10, -1];
+//! #
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # }
 //! #
 //! # let mut pathfinding = PathCache::new(
-//! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
-//! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
+//! #     (width, height),
+//! #     cost_fn(&grid),
+//! #     ManhattanNeighborhood::new(width, height),
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 //! # );
 //! #
 //! let start = (0, 0);
@@ -118,7 +165,7 @@
 //! let path = pathfinding.find_path(
 //!     start,
 //!     goal,
-//!     |(x, y)| cost_map[grid[y][x]], // cost function
+//!     cost_fn(&grid),
 //! );
 //!
 //! assert!(path.is_some());
@@ -130,7 +177,7 @@
 //!
 //! Finding multiple Goals:
 //! ```
-//! # use hierarchical_pathfinding::prelude::*;
+//! # use hierarchical_pathfinding::{prelude::*, Point};
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -143,17 +190,17 @@
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
 //! #
-//! # let cost_map = [
-//! #     1,  // empty
-//! #     10, // swamp
-//! #     -1, // wall = solid
-//! # ];
+//! # const COST_MAP: [isize; 3] = [1, 10, -1];
+//! #
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # }
 //! #
 //! # let mut pathfinding = PathCache::new(
-//! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
-//! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
+//! #     (width, height),
+//! #     cost_fn(&grid),
+//! #     ManhattanNeighborhood::new(width, height),
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 //! # );
 //! #
 //! let start = (0, 0);
@@ -163,7 +210,7 @@
 //! let paths = pathfinding.find_paths(
 //!     start,
 //!     &goals,
-//!     |(x, y)| cost_map[grid[y][x]], // cost function
+//!     cost_fn(&grid),
 //! );
 //!
 //! assert!(paths.contains_key(&goals[0]));
@@ -190,7 +237,7 @@
 //! mostly use the `next()` method of the returned Path for a few steps.
 //!
 //! ```
-//! # use hierarchical_pathfinding::prelude::*;
+//! # use hierarchical_pathfinding::{prelude::*, Point};
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -203,17 +250,17 @@
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
 //! #
-//! # let cost_map = [
-//! #     1,  // empty
-//! #     10, // swamp
-//! #     -1, // wall = solid
-//! # ];
+//! # const COST_MAP: [isize; 3] = [1, 10, -1];
+//! #
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # }
 //! #
 //! # let mut pathfinding = PathCache::new(
-//! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
-//! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
+//! #     (width, height),
+//! #     cost_fn(&grid),
+//! #     ManhattanNeighborhood::new(width, height),
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 //! # );
 //! # struct Player{ pos: (usize, usize) }
 //! # impl Player {
@@ -231,7 +278,7 @@
 //! # let path = pathfinding.find_path(
 //! #     player.pos,
 //! #     goal,
-//! #     |(x, y)| cost_map[grid[y][x]], // cost function
+//! #     cost_fn(&grid),
 //! # );
 //! // ...
 //! let mut path = path.unwrap();
@@ -263,17 +310,17 @@
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
 //! #
-//! # let cost_map = [
-//! #     1,  // empty
-//! #     10, // swamp
-//! #     -1, // wall = solid
-//! # ];
+//! # const COST_MAP: [isize; 3] = [1, 10, -1];
+//! #
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # }
 //! #
 //! # let mut pathfinding = PathCache::new(
-//! #     (width, height), // the size of the Grid
-//! #     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
-//! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
+//! #     (width, height),
+//! #     cost_fn(&grid),
+//! #     ManhattanNeighborhood::new(width, height),
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 //! # );
 //! #
 //! grid[3][1] = 0;
@@ -281,7 +328,7 @@
 //!
 //! pathfinding.tiles_changed(
 //!     &[(3, 1), (4, 4)],
-//!     |(x, y)| cost_map[grid[y][x]], // cost function
+//!     cost_fn(&grid),
 //! );
 //! ```
 //!
@@ -304,15 +351,15 @@
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
 //! #
-//! # let cost_map = [
-//! #     1,  // empty
-//! #     10, // swamp
-//! #     -1, // wall = solid
-//! # ];
+//! # const COST_MAP: [isize; 3] = [1, 10, -1];
+//! #
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # }
 //!
 //! let mut pathfinding = PathCache::new(
 //!     (width, height), // the size of the Grid
-//!     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
+//!     cost_fn(&grid), // get the cost for walking over a Tile
 //!     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //!     PathCacheConfig {
 //!         chunk_size: 3,
