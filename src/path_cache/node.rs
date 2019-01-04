@@ -1,4 +1,5 @@
-use crate::{generics::Path, NodeID, Point};
+use super::path_segment::PathSegment;
+use crate::{NodeID, Point};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -6,7 +7,7 @@ pub struct Node {
 	pub id: NodeID,
 	pub pos: Point,
 	pub walk_cost: isize,
-	pub edges: HashMap<NodeID, Path<Point>>,
+	pub edges: HashMap<NodeID, PathSegment>,
 }
 
 impl Node {

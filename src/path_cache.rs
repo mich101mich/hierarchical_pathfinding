@@ -16,6 +16,9 @@ use self::abstract_path::AbstractPathImpl;
 mod node_map;
 use self::node_map::NodeMap;
 
+mod path_segment;
+use self::path_segment::PathSegment;
+
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -112,6 +115,7 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 					&get_cost,
 					&neighborhood,
 					&mut nodes,
+					&config,
 				))
 			}
 
@@ -136,10 +140,13 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
 
 				let node = nodes.get_mut(&id).unwrap();
-				node.edges.insert(other_id, path);
+				node.edges
+					.insert(other_id, PathSegment::new(path, config.cache_paths));
 
-				let node = nodes.get_mut(&other_id).unwrap();
-				node.edges.insert(id, other_path);
+				let other_node = nodes.get_mut(&other_id).unwrap();
+				other_node
+					.edges
+					.insert(id, PathSegment::new(other_path, config.cache_paths));
 			}
 		}
 
@@ -349,7 +356,7 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 
 		let path = generics::a_star_search(
 			|id| self.nodes[&id].edges.keys().cloned().collect(),
-			|a, b| self.nodes[&a].edges[&b].cost,
+			|a, b| self.nodes[&a].edges[&b].cost(),
 			|id| self.nodes[&id].walk_cost >= 0,
 			start_id,
 			goal_id,
@@ -357,13 +364,10 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 		);
 
 		if let Some(path) = path {
-			let length = if self.config.cache_paths {
-				path.windows(2)
-					.map(|ids| self.nodes[&ids[0]].edges[&ids[1]].len())
-					.sum()
-			} else {
-				path.cost
-			};
+			let length: usize = path
+				.windows(2)
+				.map(|ids| self.nodes[&ids[0]].edges[&ids[1]].len())
+				.sum();
 
 			if self.config.a_star_fallback && length < 2 * self.config.chunk_size {
 				let path = generics::a_star_search(
@@ -381,11 +385,7 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 				let mut ret = AbstractPathImpl::<N>::new(start);
 				for ids in path.windows(2) {
 					let path = &self.nodes[&ids[0]].edges[&ids[1]];
-					if self.config.cache_paths {
-						ret.add_path(path.clone());
-					} else {
-						ret.add_node(self.nodes[&ids[1]].pos, path.cost);
-					}
+					ret.add_path_segment(path.clone());
 				}
 				Some(ret)
 			}
@@ -551,7 +551,11 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 				}
 				let other_pos = other_node.pos;
 				if let Some(path) = chunk.find_path(other_pos, pos, &get_cost, &self.neighborhood) {
-					self.nodes.add_edge(other_id, id, path);
+					self.nodes.add_edge(
+						other_id,
+						id,
+						PathSegment::new(path, self.config.cache_paths),
+					);
 				}
 			}
 			return id;
@@ -567,7 +571,11 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 
 		for (other_id, pos) in chunk.nodes.iter().zip(positions.iter()) {
 			if let Some(path) = paths.remove(pos) {
-				self.nodes.add_edge(id, *other_id, path);
+				self.nodes.add_edge(
+					id,
+					*other_id,
+					PathSegment::new(path, self.config.cache_paths),
+				);
 			}
 		}
 

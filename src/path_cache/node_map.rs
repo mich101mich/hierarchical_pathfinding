@@ -1,5 +1,5 @@
-use super::Node;
-use crate::{generics::Path, NodeID, Point};
+use super::{path_segment::PathSegment, Node};
+use crate::{NodeID, Point};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -25,7 +25,7 @@ impl NodeMap {
 		id
 	}
 
-	pub fn add_edge(&mut self, src: NodeID, target: NodeID, path: Path<Point>) {
+	pub fn add_edge(&mut self, src: NodeID, target: NodeID, path: PathSegment) {
 		let src_cost = self[&src].walk_cost;
 		let target_cost = self[&target].walk_cost;
 

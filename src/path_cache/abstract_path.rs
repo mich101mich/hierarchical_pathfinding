@@ -1,3 +1,4 @@
+use super::path_segment::{PathSegment, PathSegment::*};
 use crate::{
 	generics::{a_star_search, Cost, Path},
 	neighbors::Neighborhood,
@@ -10,8 +11,6 @@ pub trait AbstractPath: Iterator<Item = Point> + Debug {
 	fn cost(&self) -> Cost;
 	fn safe_next(&mut self, get_cost: impl Fn(Point) -> isize) -> Option<Point>;
 }
-
-use self::PathSegment::*;
 
 #[derive(Debug)]
 pub struct AbstractPathImpl<N: Neighborhood + Debug> {
@@ -57,15 +56,12 @@ where
 		}
 	}
 
-	#[allow(clippy::needless_pass_by_value)]
-	pub fn from_node_path(neighborhood: N, path: Path<Point>) -> AbstractPathImpl<N> {
-		AbstractPathImpl {
-			neighborhood: Some(neighborhood),
-			total_cost: path.cost,
-			path: path.windows(2).map(|s| Unknown(s[0], s[1])).collect(),
-			end: path[path.len() - 1],
-			current_index: (0, 1),
-		}
+	pub fn add_path_segment(&mut self, path: PathSegment) -> &mut Self {
+		assert!(self.end == path.start(), "Added disconnected PathSegment");
+		self.total_cost += path.cost();
+		self.end = path.end();
+		self.path.push(path);
+		self
 	}
 
 	pub fn add_path(&mut self, path: Path<Point>) -> &mut Self {
@@ -75,8 +71,13 @@ where
 		self
 	}
 
-	pub fn add_node(&mut self, node: Point, cost: Cost) -> &mut Self {
-		self.path.push(Unknown(self.end, node));
+	pub fn add_node(&mut self, node: Point, cost: Cost, len: usize) -> &mut Self {
+		self.path.push(Unknown {
+			start: self.end,
+			end: node,
+			cost,
+			len,
+		});
 		self.total_cost += cost;
 		self.end = node;
 		self
@@ -95,7 +96,7 @@ where
 			return None;
 		}
 		let mut current = &self.path[self.current_index.0];
-		if let Unknown(start, end) = *current {
+		if let Unknown { start, end, .. } = *current {
 			let neighborhood = self
 				.neighborhood
 				.as_ref()
@@ -146,7 +147,7 @@ where
 			return None;
 		}
 		let current = &self.path[self.current_index.0];
-		if let Unknown(_, _) = *current {
+		if let Unknown { .. } = *current {
 			panic!(
 				"Tried calling next() on a Path that is not fully known. Use safe_next instead."
 			);
@@ -164,10 +165,4 @@ where
 			panic!("how.");
 		}
 	}
-}
-
-#[derive(Clone, Debug)]
-pub enum PathSegment {
-	Known(Path<Point>),
-	Unknown(Point, Point),
 }

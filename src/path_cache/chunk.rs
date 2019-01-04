@@ -1,5 +1,5 @@
-use super::NodeMap;
-use crate::{neighbors::Neighborhood, NodeID, Point};
+use super::{path_segment::PathSegment, NodeMap};
+use crate::{neighbors::Neighborhood, NodeID, PathCacheConfig, Point};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug)]
@@ -16,6 +16,7 @@ impl Chunk {
 		get_cost: impl Fn(Point) -> isize,
 		neighborhood: &impl Neighborhood,
 		all_nodes: &mut NodeMap,
+		config: &PathCacheConfig,
 	) -> Chunk {
 		let mut nodes = HashSet::new();
 
@@ -64,10 +65,13 @@ impl Chunk {
 				);
 
 				let node = all_nodes.get_mut(&id).unwrap();
-				node.edges.insert(other_id, path);
+				node.edges
+					.insert(other_id, PathSegment::new(path, config.cache_paths));
 
-				let node = all_nodes.get_mut(&other_id).unwrap();
-				node.edges.insert(id, other_path);
+				let other_node = all_nodes.get_mut(&other_id).unwrap();
+				other_node
+					.edges
+					.insert(id, PathSegment::new(other_path, config.cache_paths));
 			}
 		}
 
