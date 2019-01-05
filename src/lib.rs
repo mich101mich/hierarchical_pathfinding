@@ -28,13 +28,14 @@
 //! can be easily searched.
 //!
 //! Since the Graph is usually not an exact representation of the Grid, **the resulting Paths will
-//! be slightly worse than the actual best Path**. This is usually not a problem, since the
-//! purpose of Hierarchical Pathfinding is to quickly find the next direction to go in or a
-//! Heuristic for the total Cost of a Path or to determine weather or not a Goal is reachable.
-//! All of these are not affected by the exact Cost or Path. The only time where the actual best
-//! Path would noticeably differ from this implementation's result is in the case of short Paths of
-//! roughly `Length < 2 * chunk_size`. That is why this implementation calls the regular A* search
-//! after HPA* confirmed the Path to be short. (This behavior can be turned of using the Config).
+//! be slightly worse than the actual best Path** (unless [`config.perfect_paths`](PathCacheConfig::perfect_paths)
+//! is set to `true`). This is usually not a problem, since the purpose of Hierarchical Pathfinding
+//! is to quickly find the next direction to go in or a Heuristic for the total Cost of a Path or
+//! to determine weather or not a Goal is reachable. All of these are not affected by the exact
+//! Cost or Path. The only time where the actual best Path would noticeably differ from this
+//! implementation's result is in the case of short Paths of roughly `Length < 2 * chunk_size`.
+//! That is why this implementation calls the regular A* search after HPA* confirmed the Path to
+//! be short. (This behavior can be turned of using the Config).
 //!
 //! This crate provides an implementation of a Hierarchical Pathfinding Algorithm for any generic Grid.
 //! Paths can be searched using either A* for a Path to a single Tile, or Dijkstra for searching
@@ -169,7 +170,7 @@
 //! );
 //!
 //! assert!(path.is_some());
-//! let path = path.unwrap();
+//! let mut path = path.unwrap();
 //!
 //! assert_eq!(path.cost(), 12);
 //! ```
@@ -214,7 +215,7 @@
 //! );
 //!
 //! assert!(paths.contains_key(&goals[0]));
-//! assert_eq!(paths[&goals[0]].cost, 12);
+//! assert_eq!(paths[&goals[0]].cost(), 12);
 //!
 //! assert!(!paths.contains_key(&goals[1]));
 //! ```
@@ -269,24 +270,22 @@
 //! #     }
 //! # }
 //! #
-//! # let mut player = Player {
-//! #     pos: (0, 0),
-//! #     //...
-//! # };
-//! # let goal = (4, 4);
-//! #
-//! # let path = pathfinding.find_path(
-//! #     player.pos,
-//! #     goal,
-//! #     cost_fn(&grid),
-//! # );
-//! // ...
-//! let mut path = path.unwrap();
+//! let mut player = Player {
+//!     pos: (0, 0),
+//!     //...
+//! };
+//! let goal = (4, 4);
+//!
+//! let mut path = pathfinding.find_path(
+//!     player.pos,
+//!     goal,
+//!     cost_fn(&grid),
+//! ).unwrap();
 //!
 //! player.move_to(path.next().unwrap());
 //! assert_eq!(player.pos, (0, 1));
 //!
-//! // wait
+//! // wait for next turn or whatever
 //!
 //! player.move_to(path.next().unwrap());
 //! assert_eq!(player.pos, (0, 2));
@@ -297,7 +296,7 @@
 //! This means however, that the user is responsible for storing and maintaining both the Grid and the PathCache.
 //! It is also necessary to update the PathCache when the Grid has changed to keep it consistent:
 //! ```
-//! # use hierarchical_pathfinding::{PathCache, neighbors::ManhattanNeighborhood};
+//! # use hierarchical_pathfinding::{prelude::*, Point};
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -338,7 +337,7 @@
 //! The PathCacheConfig struct also provides defaults for low Memory Usage [`PathCacheConfig::LOW_MEM`]
 //! or best Performance [`PathCacheConfig::HIGH_PERFORMANCE`]
 //! ```
-//! use hierarchical_pathfinding::{PathCache, PathCacheConfig, neighbors::ManhattanNeighborhood};
+//! # use hierarchical_pathfinding::{prelude::*, Point};
 //! #
 //! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
@@ -384,6 +383,10 @@ pub mod neighbors;
 pub mod generics;
 
 /// The prelude for this crate.
+/// 
+/// Note: Even though most examples use the internal type-definition [`Point`]
+/// (aka `(usize, usize)`), it is not included in the prelude since most users probably have
+/// another implementation with the same name in scope.
 pub mod prelude {
     pub use crate::{
         neighbors::{ManhattanNeighborhood, MooreNeighborhood, Neighborhood},

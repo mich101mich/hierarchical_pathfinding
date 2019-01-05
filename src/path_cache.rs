@@ -267,7 +267,7 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 	/// };
 	/// let goal = (4, 4);
 	///
-	/// let path = pathfinding.find_path(
+	/// let mut path = pathfinding.find_path(
 	///     player.pos,
 	///     goal,
 	///     cost_fn(&grid),
@@ -490,7 +490,7 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 	///     &[goal],
 	///     cost_fn(&grid),
 	/// );
-	/// let dijkstra_path: Vec<Point> = paths[&goal].collect();
+	/// let dijkstra_path: Vec<Point> = paths[&goal].clone().collect();
 	///
 	/// let a_star_path: Vec<Point> = pathfinding.find_path(
 	///     start,
@@ -504,7 +504,7 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 		&mut self,
 		_start: Point,
 		_goals: &[Point],
-		_get_cost: impl 'static + Fn(Point) -> isize,
+		_get_cost: impl Fn(Point) -> isize,
 	) -> HashMap<Point, impl AbstractPath> {
 		let ret: HashMap<Point, AbstractPathImpl<N>> = HashMap::new();
 		ret
