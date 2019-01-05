@@ -558,24 +558,51 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 					);
 				}
 			}
-			return id;
+		} else {
+			let positions = chunk
+				.nodes
+				.iter()
+				.map(|id| self.nodes[id].pos)
+				.collect::<Vec<_>>();
+
+			let mut paths = chunk.find_paths(pos, &positions, &get_cost, &self.neighborhood);
+
+			for (other_id, pos) in chunk.nodes.iter().zip(positions.iter()) {
+				if let Some(path) = paths.remove(pos) {
+					self.nodes.add_edge(
+						id,
+						*other_id,
+						PathSegment::new(path, self.config.cache_paths),
+					);
+				}
+			}
 		}
 
-		let positions = chunk
+		// add any direct neighbors
+		let possible = self.neighborhood.get_all_neighbors(pos);
+		let neighbors = self
 			.nodes
-			.iter()
-			.map(|id| self.nodes[id].pos)
+			.values()
+			.filter(|node| possible.contains(&node.pos)) // any Node next to me
+			.filter(|node| !node.edges.contains_key(&id)) // that is not already connected
+			.map(|node| (node.id, node.pos))
 			.collect::<Vec<_>>();
 
-		let mut paths = chunk.find_paths(pos, &positions, &get_cost, &self.neighborhood);
+		for (other_id, other_pos) in neighbors {
+			if cost >= 0 {
+				let path = generics::Path::new(vec![pos, other_pos], get_cost(pos) as usize);
+				let node = self.nodes.get_mut(&id).unwrap();
+				node.edges
+					.insert(other_id, PathSegment::new(path, self.config.cache_paths));
+			}
+			if get_cost(other_pos) >= 0 {
+				let other_path =
+					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
 
-		for (other_id, pos) in chunk.nodes.iter().zip(positions.iter()) {
-			if let Some(path) = paths.remove(pos) {
-				self.nodes.add_edge(
-					id,
-					*other_id,
-					PathSegment::new(path, self.config.cache_paths),
-				);
+				let other_node = self.nodes.get_mut(&other_id).unwrap();
+				other_node
+					.edges
+					.insert(id, PathSegment::new(other_path, self.config.cache_paths));
 			}
 		}
 
