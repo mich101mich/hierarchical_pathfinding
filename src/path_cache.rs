@@ -98,14 +98,14 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 		for x in 0..chunk_hor {
 			let mut row = Vec::with_capacity(chunk_vert);
 			let w = if x == chunk_hor - 1 {
-				width % config.chunk_size
+				width - (chunk_hor - 1) * config.chunk_size
 			} else {
 				config.chunk_size
 			};
 
 			for y in 0..chunk_vert {
 				let h = if y == chunk_vert - 1 {
-					height % config.chunk_size
+					height - (chunk_vert - 1) * config.chunk_size
 				} else {
 					config.chunk_size
 				};
