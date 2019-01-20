@@ -112,6 +112,7 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 				row.push(Chunk::new(
 					(x * config.chunk_size, y * config.chunk_size),
 					(w, h),
+					(width, height),
 					&get_cost,
 					&neighborhood,
 					&mut nodes,

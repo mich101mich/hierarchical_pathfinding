@@ -13,6 +13,7 @@ impl Chunk {
 	pub fn new(
 		pos: Point,
 		size: (usize, usize),
+		total_size: (usize, usize),
 		get_cost: impl Fn(Point) -> isize,
 		neighborhood: &impl Neighborhood,
 		all_nodes: &mut NodeMap,
@@ -29,7 +30,7 @@ impl Chunk {
 		candidates.insert((pos.0 + size.0 - 1, pos.1 + size.1 - 1));
 
 		for dir in 0..4 {
-			Chunk::calculate_side_nodes(dir, pos, size, &get_cost, &mut candidates);
+			Chunk::calculate_side_nodes(dir, pos, size, total_size, &get_cost, &mut candidates);
 		}
 		for (p, cost) in candidates
 			.into_iter()
@@ -82,30 +83,30 @@ impl Chunk {
 		dir: usize,
 		base_pos: Point,
 		size: (usize, usize),
+		total_size: (usize, usize),
 		get_cost: impl Fn(Point) -> isize,
 		candidates: &mut HashSet<Point>,
 	) {
 		let mut current = [
 			(base_pos.0, base_pos.1),
-			(base_pos.0 + size.0 - 1, base_pos.1 + 1),
+			(base_pos.0 + size.0 - 1, base_pos.1),
 			(base_pos.0, base_pos.1 + size.1 - 1),
-			(base_pos.0, base_pos.1 + 1),
+			(base_pos.0, base_pos.1),
 		][dir];
 		let (next_dir, length) = if dir % 2 == 0 {
 			(1, size.0)
 		} else {
-			(2, size.1 - 2) // - 2 because otherwise corners would be considered twice
+			(2, size.1)
 		};
 		// 0 == up: start at top-left, go right
 		// 1 == right: start at top-right, go down
 		// 2 == down: start at bottom-left, go right
 		// 3 == left: start at top-left, go down
-
-		if get_in_dir(current, dir, base_pos, size).is_none() {
+		if get_in_dir(current, dir, (0, 0), total_size).is_none() {
 			return;
 		}
 
-		let opposite = |p: Point| get_in_dir(p, dir, base_pos, size).unwrap();
+		let opposite = |p: Point| get_in_dir(p, dir, (0, 0), total_size).unwrap();
 		let total_cost = |p: Point| get_cost(p) + get_cost(opposite(p));
 
 		let mut has_gap = false;
@@ -138,7 +139,7 @@ impl Chunk {
 					let mut min = total_cost(gap_start_pos).min(total_cost(gap_end_pos));
 					let mut p = gap_start_pos;
 					for _ in (gap_start + 1)..gap_end {
-						p = get_in_dir(p, next_dir, base_pos, size).unwrap();
+						p = get_in_dir(p, next_dir, (0, 0), total_size).unwrap();
 						let cost = total_cost(p);
 						if cost < min {
 							candidates.insert(p);
