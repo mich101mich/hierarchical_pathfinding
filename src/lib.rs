@@ -367,7 +367,7 @@
 //!     }
 //! );
 //!
-//! assert!(false, "implement some kind of test");
+//! assert_eq!(pathfinding.config().chunk_size, 3);
 //! ```
 
 /// The Type used to reference a Node in the abstracted Graph

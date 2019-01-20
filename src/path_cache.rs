@@ -568,6 +568,11 @@ impl<N: Neighborhood> PathCache<N> {
 			.map(|(id, _)| *id)
 	}
 
+	/// Returns the config used to create this PathCache
+	pub fn config(&self) -> PathCacheConfig {
+		self.config
+	}
+
 	fn add_node(&mut self, pos: Point, get_cost: &Fn(Point) -> isize) -> NodeID {
 		let cost = get_cost(pos);
 		let id = self.nodes.add_node(pos, cost);
