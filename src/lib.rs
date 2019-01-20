@@ -205,7 +205,7 @@
 //! # );
 //! #
 //! let start = (0, 0);
-//! let goals = [(4, 4), (0, 2)];
+//! let goals = [(4, 4), (2, 0)];
 //!
 //! // find_paths returns a HashMap<goal, Path> for all successes
 //! let paths = pathfinding.find_paths(
@@ -214,9 +214,10 @@
 //!     cost_fn(&grid),
 //! );
 //!
+//! // (4, 4) is reachable
 //! assert!(paths.contains_key(&goals[0]));
-//! assert_eq!(paths[&goals[0]].cost(), 12);
 //!
+//! // (2, 0) is not reachable
 //! assert!(!paths.contains_key(&goals[1]));
 //! ```
 //! For more information, see [`find_paths`](PathCache::find_paths).

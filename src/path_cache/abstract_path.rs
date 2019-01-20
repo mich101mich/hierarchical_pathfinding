@@ -7,13 +7,13 @@ use crate::{
 
 use std::fmt::Debug;
 
-pub trait AbstractPath: Iterator<Item = Point> + Debug {
+pub trait AbstractPath: Iterator<Item = Point> + Debug + Clone {
 	fn cost(&self) -> Cost;
 	fn safe_next(&mut self, get_cost: impl Fn(Point) -> isize) -> Option<Point>;
 }
 
-#[derive(Debug)]
-pub struct AbstractPathImpl<N: Neighborhood + Debug> {
+#[derive(Debug, Clone)]
+pub struct AbstractPathImpl<N: Neighborhood> {
 	neighborhood: Option<N>,
 	total_cost: Cost,
 	path: Vec<PathSegment>,
@@ -23,7 +23,7 @@ pub struct AbstractPathImpl<N: Neighborhood + Debug> {
 
 impl<N> AbstractPathImpl<N>
 where
-	N: Neighborhood + Debug,
+	N: Neighborhood,
 {
 	pub fn new(start: Point) -> AbstractPathImpl<N> {
 		AbstractPathImpl {
@@ -86,7 +86,7 @@ where
 
 impl<N> AbstractPath for AbstractPathImpl<N>
 where
-	N: Neighborhood + Debug,
+	N: Neighborhood,
 {
 	fn cost(&self) -> Cost {
 		self.total_cost
@@ -139,7 +139,7 @@ where
 
 impl<N> Iterator for AbstractPathImpl<N>
 where
-	N: Neighborhood + Debug,
+	N: Neighborhood,
 {
 	type Item = Point;
 	fn next(&mut self) -> Option<Point> {

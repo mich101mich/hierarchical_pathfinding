@@ -1,6 +1,7 @@
 //! A crate with the most common Neighborhoods
 
 use crate::Point;
+use std::fmt::Debug;
 
 /// Defines how a Path can move along the Grid.
 ///
@@ -17,7 +18,7 @@ use crate::Point;
 /// up, down, left or right
 /// - [`MooreNeighborhood`] for Agents that can move
 /// up, down, left, right, as well as the 4 diagonals (up-right, ...)
-pub trait Neighborhood : Clone {
+pub trait Neighborhood: Clone + Debug {
 	/// Provides a list of Neighbors of a Point
 	///
 	/// Note that it is not necessary to check weather the Tile at a Point is solid or not.

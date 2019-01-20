@@ -20,11 +20,10 @@ mod path_segment;
 use self::path_segment::PathSegment;
 
 use std::collections::HashMap;
-use std::fmt::Debug;
 
 /// A struct to store the Hierarchical Pathfinding information.
 #[derive(Clone, Debug)]
-pub struct PathCache<N: Neighborhood + Debug> {
+pub struct PathCache<N: Neighborhood> {
 	width: usize,
 	height: usize,
 	chunks: Vec<Vec<Chunk>>,
@@ -33,7 +32,7 @@ pub struct PathCache<N: Neighborhood + Debug> {
 	config: PathCacheConfig,
 }
 
-impl<N: Neighborhood + Debug> PathCache<N> {
+impl<N: Neighborhood> PathCache<N> {
 	/// Creates a new PathCache
 	///
 	/// ## Arguments
@@ -441,7 +440,7 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 	/// # );
 	/// #
 	/// let start = (0, 0);
-	/// let goals = [(4, 4), (0, 2)];
+	/// let goals = [(4, 4), (2, 0)];
 	///
 	/// // find_paths returns a HashMap<goal, Path> for all successes
 	/// let paths = pathfinding.find_paths(
@@ -450,8 +449,10 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 	///     cost_fn(&grid),
 	/// );
 	///
+	/// // (4, 4) is reachable
 	/// assert!(paths.contains_key(&goals[0]));
 	///
+	/// // (2, 0) is not reachable
 	/// assert!(!paths.contains_key(&goals[1]));
 	/// ```
 	///
@@ -503,11 +504,43 @@ impl<N: Neighborhood + Debug> PathCache<N> {
 	/// ```
 	pub fn find_paths(
 		&mut self,
-		_start: Point,
-		_goals: &[Point],
-		_get_cost: impl Fn(Point) -> isize,
+		start: Point,
+		goals: &[Point],
+		get_cost: impl Fn(Point) -> isize,
 	) -> HashMap<Point, impl AbstractPath> {
-		let ret: HashMap<Point, AbstractPathImpl<N>> = HashMap::new();
+		let start_id = self
+			.get_node_id(start)
+			.unwrap_or_else(|| self.add_node(start, &get_cost));
+
+		let goal_ids = goals
+			.iter()
+			.map(|&goal| {
+				self.get_node_id(goal)
+					.unwrap_or_else(|| self.add_node(goal, &get_cost))
+			})
+			.collect::<Vec<_>>();
+
+		let paths = generics::dijkstra_search(
+			|id| self.nodes[&id].edges.keys().cloned().collect(),
+			|a, b| self.nodes[&a].edges[&b].cost(),
+			|id| self.nodes[&id].walk_cost >= 0,
+			start_id,
+			&goal_ids,
+		);
+
+		let mut ret = HashMap::new();
+
+		for (&goal, id) in goals.iter().zip(goal_ids) {
+			if let Some(path) = paths.get(&id) {
+				let mut ret_path = AbstractPathImpl::<N>::new(start);
+				for ids in path.windows(2) {
+					let path = &self.nodes[&ids[0]].edges[&ids[1]];
+					ret_path.add_path_segment(path.clone());
+				}
+				ret.insert(goal, ret_path);
+			}
+		}
+
 		ret
 	}
 
