@@ -5,7 +5,7 @@
 /// # use hierarchical_pathfinding::PathCacheConfig;
 /// assert_eq!(
 /// 	PathCacheConfig {
-/// 		chunk_size: 8,
+/// 		chunk_size: 16,
 /// 		cache_paths: true,
 /// 		keep_insertions: true,
 /// 		a_star_fallback: true,
@@ -14,9 +14,25 @@
 /// 	Default::default()
 /// );
 /// ```
+/// 
+/// Comparison of options:
+/// TODO: make benchmark
+/// 
+/// For testing, a set of 100 random Grids of 1000x1000 in size was used. Values are averages
+/// over all Grids.
+/// 
+/// Variant | Time | Memory | Correctness
+/// --------|------|--------|------------
+/// 
+/// - Time = time to calculate the Path.
+/// - Memory = Memory usage of the PathCache.
+/// - Correctness = (Result.cost - Best.cost) / Best.cost * 100%. (Best being the actual perfect Path)
+/// 	= How good the configuration is compared to an optimal Path using regular A*
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PathCacheConfig {
-	/// The size of the individual Chunks (defaults to `8`)
+	/// The size of the individual Chunks (defaults to `16`).
+	/// 
+	/// The best value for this greatly depends on the size of the Grid.
 	pub chunk_size: usize,
 	/// `true` (default): store the Paths inside each Chunk.
 	///
@@ -58,7 +74,7 @@ impl PathCacheConfig {
 	/// # use hierarchical_pathfinding::PathCacheConfig;
 	/// assert_eq!(
 	/// 	PathCacheConfig {
-	/// 		chunk_size: 16,
+	/// 		chunk_size: 128,
 	/// 		cache_paths: false,
 	/// 		keep_insertions: false,
 	/// 		a_star_fallback: true,
@@ -68,7 +84,7 @@ impl PathCacheConfig {
 	/// );
 	/// ```
 	pub const LOW_MEM: PathCacheConfig = PathCacheConfig {
-		chunk_size: 16,
+		chunk_size: 128,
 		cache_paths: false,
 		keep_insertions: false,
 		a_star_fallback: true,
@@ -81,7 +97,7 @@ impl PathCacheConfig {
 	/// # use hierarchical_pathfinding::PathCacheConfig;
 	/// assert_eq!(
 	/// 	PathCacheConfig {
-	/// 		chunk_size: 8,
+	/// 		chunk_size: 64,
 	/// 		cache_paths: true,
 	/// 		keep_insertions: true,
 	/// 		a_star_fallback: false,
@@ -91,7 +107,7 @@ impl PathCacheConfig {
 	/// );
 	/// ```
 	pub const HIGH_PERFORMANCE: PathCacheConfig = PathCacheConfig {
-		chunk_size: 8,
+		chunk_size: 64,
 		cache_paths: true,
 		keep_insertions: true,
 		a_star_fallback: false,
@@ -102,7 +118,7 @@ impl PathCacheConfig {
 impl Default for PathCacheConfig {
 	fn default() -> PathCacheConfig {
 		PathCacheConfig {
-			chunk_size: 8,
+			chunk_size: 16,
 			cache_paths: true,
 			keep_insertions: true,
 			a_star_fallback: true,

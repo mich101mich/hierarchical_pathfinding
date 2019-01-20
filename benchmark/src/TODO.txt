@@ -1,0 +1,46 @@
+ [1]-1 10  1  1 -1  1 (1)| 1  1 10 -1  1  1 -1  1
+  1  1  1  1  1  1 -1 -1 |-1 -1  1  1 -1 10  1  1
+ 10  1  1  1  1  1 -1 10 |-1 10  1 10  1 10  1  1
+  1  1 10 -1  1 -1  1 -1 |-1  1  1  1  1 -1  1 -1
+  1 -1  1 10  1  1 10 10 |10 -1 -1 10  1  1 -1  1
+  1  1  1 -1 10  1 -1 -1 | 1  1  1  1  1 -1  1 -1
+ -1 10  1  1 10  1  1  1 |-1 -1  1  1 10 -1 10  1
+ [1] 1 10 10 -1 -1  1 -1 | 1  1  1 10 -1 10 -1 10
+-------------------------+-----------------------
+ [1] 1 -1  1  1 -1  1 [1]|10 10  1  1 -1 10  1 10
+  1  1  1  1  1 -1 10 -1 |-1  1 10  1  1  1 -1 10
+ -1 10 10  1  1 10 -1  1 | 1  1 -1  1  1 -1  1  1
+  1 -1 -1 -1  1 -1 10  1 |-1 -1 10 -1 -1 10  1  1
+  1  1  1 10 10  1 -1  1 |-1 -1  1 10 10  1 -1  1
+  1 -1  1 -1 -1 -1  1 -1 |-1 -1 -1  1  1  1 -1 -1
+  1  1  1 10  1 -1 10  1 |-1  1 -1  1 10  1  1  1
+ [1]-1 -1 -1  1 -1 10 -1 | 1 10 -1  1  1  1  1 10
+
+
+
+THERE SHOULD BE AN ENTRANCE AT (6, 7) - (6, 8) !!!!!!!!!!!!!!!!!!!!!!!!!
+GAAAAAAAAAH!!!!
+AND (7, 4) - (8, 4)
+FUCK!!!!!
+
+
+thread 'main' panicked at 'Failed to obtain Path in PathCache { width: 16, height: 16, chunks: [[
+	Chunk { pos: (0, 0), size: (8, 8), nodes: {0, 1, 2} }, 
+	Chunk { pos: (0, 8), size: (8, 8), nodes: {3, 5, 4} }], [
+	Chunk { pos: (8, 0), size: (8, 8), nodes: {7, 8, 6, 9} }, 
+	Chunk { pos: (8, 8), size: (8, 8), nodes: {12, 13, 11, 10} }]],
+nodes: NodeMap { nodes: {
+	0: Node { id: 0, pos: (0, 0), walk_cost: 1, edges: {1} }, 
+	1: Node { id: 1, pos: (0, 7), walk_cost: 1, edges: {4, 0} }, 
+	2: Node { id: 2, pos: (7, 0), walk_cost: 1, edges: {7} }, 
+	3: Node { id: 3, pos: (7, 8), walk_cost: 1, edges: {11} }, 
+	4: Node { id: 4, pos: (0, 8), walk_cost: 1, edges: {5, 1} }, 
+	5: Node { id: 5, pos: (0, 15), walk_cost: 1, edges: {4} }, 
+	6: Node { id: 6, pos: (15, 0), walk_cost: 1, edges: {7, 8} }}, next_id: 14 }, neighborhood: ManhattanNeighborhood { width: 16, height: 16 }, config: PathCacheConfig { chunk_size: 8, cache_paths: false, keep_insertions: true, a_star_fallback: true, perfect_paths: false } }. best: 51', src\main.rs:102:17
+	7: Node { id: 7, pos: (8, 0), walk_cost: 1, edges: {6, 2, 8} }, 
+	8: Node { id: 8, pos: (8, 7), walk_cost: 1, edges: {7, 11, 6} }, 
+	9: Node { id: 9, pos: (15, 7), walk_cost: 10, edges: {12} }, 
+	10: Node { id: 10, pos: (15, 15), walk_cost: 10, edges: {11, 12} }, 
+	11: Node { id: 11, pos: (8, 8), walk_cost: 10, edges: {10, 12, 8, 3} }, 
+	12: Node { id: 12, pos: (15, 8), walk_cost: 10, edges: {10,9, 11} }, 
+	13: Node { id: 13, pos: (8, 15), walk_cost: 1, edges: {} }, 
