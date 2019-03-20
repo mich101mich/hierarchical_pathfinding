@@ -6,7 +6,9 @@ A Rust crate to find Paths on a Grid using HPA* (Hierarchical Pathfinding A*) an
 [![Build Status](https://travis-ci.org/mich101mich/hierarchical_pathfinding.svg?branch=master)](https://travis-ci.org/mich101mich/hierarchical_pathfinding)
 Tests: [![CircleCI](https://circleci.com/gh/mich101mich/hierarchical_pathfinding.svg?style=svg)](https://circleci.com/gh/mich101mich/hierarchical_pathfinding)
 
-# **Currently unfinished. completion status: ~90%**
+## Status: not quite finished
+- cache creation and pathfinding fully functional
+- missing: cache update when the grid changes
 
 ## Description
 Provides a faster method of finding Paths on a Grid-like structure than regular Pathfinding algorithms. This is achieved by caching segments of Paths that form a higher order Node Graph. Finding a Path in that Graph is considerably faster than traversing all the tiles of the Grid individually, at the cost of producing Paths that are _slightly_ worse than the optimal Path.
