@@ -38,10 +38,8 @@ use std::hash::Hash;
 /// 			.iter()
 /// 			.enumerate()
 /// 			.filter(|&(_, cost)| *cost != -1)
-/// 			.map(|(id, _)| id)
-/// 			.collect()
+/// 			.map(|(id, cost)| (id, *cost as usize))
 /// 	},
-/// 	|a, b| cost_matrix[a][b] as usize, // get_cost
 /// 	|_| true, // is_walkable
 /// 	A, // start
 /// 	&[D, E], // goals
@@ -58,24 +56,25 @@ use std::hash::Hash;
 /// ```
 ///
 /// ## Solid Goals
-/// It is possible to calculate the shortest Path to for example a Wall and other non-walkable Nodes using this function.
-/// To do that, simply supply a Function to the `is_walkable` Parameter that returns `false` for Nodes that
-/// should not be used as part of an actual Path. If there are no such Nodes in the Graph,
-/// is_walkable may simply be set to `|_| true`
+/// It is possible to calculate the shortest Path to for example a Wall and other non-walkable
+/// Nodes using this function. To do that, simply supply a Function to the `is_walkable` Parameter
+/// that returns `false` for Nodes that should not be used as part of an actual Path. If there are
+/// no such Nodes in the Graph, `is_walkable` may simply be set to `|_| true`.  
+/// In the case that a Path to a non-walkable Goal is requested, the neighbor of that Goal with the
+/// shortest Path from the Start is returned, if any is reachable. "neighbor" in this context is
+/// a Node for which `get_all_neighbors` contains the Goal.
 ///
 /// ## Arguments
-/// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node. It is only invoked once for every expanded Node.
-/// - `get_cost` - a Function that takes two Nodes (a, b) and returns the Cost to go from a to b
-/// - `is_walkable` - a Function that determines if a Node can be walked over. see [Solid Goals](#solid-goals) for more info
+/// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node.
+/// 	The returned value is a Tuple of the `Id` of the neighbor and the Cost to get there.
 /// - `start` - the starting Node
 /// - `goals` - the Goals that this function is supposed to search for
 ///
 /// ## Returns
 /// a HashMap with all reachable Goal's Ids as the Key and the shortest Path to reach that Goal as Value.
 /// The first Node in the Path is always the `start` and the last is the corresponding Goal
-pub fn dijkstra_search<Id: Copy + Eq + Hash>(
-	get_all_neighbors: impl Fn(Id) -> Vec<Id>,
-	get_cost: impl Fn(Id, Id) -> Cost,
+pub fn dijkstra_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = (Id, Cost)>>(
+	get_all_neighbors: impl Fn(Id) -> NeighborIter,
 	is_walkable: impl Fn(Id) -> bool,
 	start: Id,
 	goals: &[Id],
@@ -105,8 +104,8 @@ pub fn dijkstra_search<Id: Copy + Eq + Hash>(
 			}
 		}
 
-		for other_id in get_all_neighbors(current_id) {
-			let other_cost = cost + get_cost(current_id, other_id);
+		for (other_id, delta_cost) in get_all_neighbors(current_id) {
+			let other_cost = cost + delta_cost;
 
 			if !is_walkable(other_id) {
 				let mut is_goal = false;

@@ -1,4 +1,4 @@
-use super::{path_segment::PathSegment, NodeMap};
+use super::{path_segment::PathSegment, utils::*, NodeMap};
 use crate::{neighbors::Neighborhood, NodeID, PathCacheConfig, Point};
 use std::collections::{HashMap, HashSet};
 
@@ -10,16 +10,20 @@ pub struct Chunk {
 }
 
 impl Chunk {
-	pub fn new(
+	pub fn new<N: Neighborhood>(
 		pos: Point,
 		size: (usize, usize),
 		total_size: (usize, usize),
 		get_cost: impl Fn(Point) -> isize,
-		neighborhood: &impl Neighborhood,
+		neighborhood: &N,
 		all_nodes: &mut NodeMap,
 		config: &PathCacheConfig,
 	) -> Chunk {
-		let mut nodes = HashSet::new();
+		let mut chunk = Chunk {
+			pos,
+			size,
+			nodes: HashSet::new(),
+		};
 
 		let mut candidates = HashSet::new();
 
@@ -29,58 +33,31 @@ impl Chunk {
 		candidates.insert((pos.0 + size.0 - 1, pos.1));
 		candidates.insert((pos.0 + size.0 - 1, pos.1 + size.1 - 1));
 
-		for dir in 0..4 {
+		for dir in Dir::all() {
+			if dir == UP && chunk.top() == 0
+				|| dir == RIGHT && chunk.right() == total_size.0
+				|| dir == DOWN && chunk.bottom() == total_size.1
+				|| dir == LEFT && chunk.left() == 0
+			{
+				continue;
+			}
 			Chunk::calculate_side_nodes(dir, pos, size, total_size, &get_cost, &mut candidates);
 		}
-		for (p, cost) in candidates
+
+		let nodes: Vec<NodeID> = candidates
 			.into_iter()
 			.map(|p| (p, get_cost(p)))
 			.filter(|(_, cost)| *cost >= 0)
-		{
-			nodes.insert(all_nodes.add_node(p, cost));
-		}
+			.map(|(p, cost)| all_nodes.add_node(p, cost))
+			.collect();
 
-		let chunk = Chunk { pos, size, nodes };
-
-		let mut to_visit = chunk.nodes.iter().cloned().collect::<Vec<_>>();
-		let mut points = to_visit
-			.iter()
-			.map(|id| all_nodes[id].pos)
-			.collect::<Vec<_>>();
-
-		// connect every Node to every other Node
-		while let Some(id) = to_visit.pop() {
-			if to_visit.is_empty() {
-				break;
-			}
-			let point = points.pop().unwrap();
-			let paths = chunk.find_paths(point, &points, &get_cost, neighborhood);
-			for (other, path) in paths {
-				let other_id = *to_visit
-					.iter()
-					.find(|id| all_nodes[id].pos == other)
-					.unwrap();
-				let other_path = path.reversed(
-					get_cost(path[0]) as usize,
-					get_cost(*path.last().unwrap()) as usize,
-				);
-
-				let node = all_nodes.get_mut(&id).unwrap();
-				node.edges
-					.insert(other_id, PathSegment::new(path, config.cache_paths));
-
-				let other_node = all_nodes.get_mut(&other_id).unwrap();
-				other_node
-					.edges
-					.insert(id, PathSegment::new(other_path, config.cache_paths));
-			}
-		}
+		chunk.add_nodes(nodes, &get_cost, neighborhood, all_nodes, config);
 
 		chunk
 	}
 
 	fn calculate_side_nodes(
-		dir: usize,
+		dir: Dir,
 		base_pos: Point,
 		size: (usize, usize),
 		total_size: (usize, usize),
@@ -92,11 +69,11 @@ impl Chunk {
 			(base_pos.0 + size.0 - 1, base_pos.1),
 			(base_pos.0, base_pos.1 + size.1 - 1),
 			(base_pos.0, base_pos.1),
-		][dir];
-		let (next_dir, length) = if dir % 2 == 0 {
-			(1, size.0)
+		][dir.num()];
+		let (next_dir, length) = if dir.is_vertical() {
+			(RIGHT, size.0)
 		} else {
-			(2, size.1)
+			(DOWN, size.1)
 		};
 		// 0 == up: start at top-left, go right
 		// 1 == right: start at top-right, go down
@@ -164,21 +141,59 @@ impl Chunk {
 		}
 	}
 
+	pub fn add_nodes<N: Neighborhood>(
+		&mut self,
+		mut to_visit: Vec<NodeID>,
+		get_cost: &Fn(Point) -> isize,
+		neighborhood: &N,
+		all_nodes: &mut NodeMap,
+		config: &PathCacheConfig,
+	) {
+		let mut points = self
+			.nodes
+			.iter()
+			.chain(to_visit.iter())
+			.map(|id| all_nodes[id].pos)
+			.to_vec();
+
+		for &id in to_visit.iter() {
+			self.nodes.insert(id);
+		}
+
+		// connect every Node to every other Node
+		while let Some(id) = to_visit.pop() {
+			if to_visit.is_empty() {
+				break;
+			}
+			let point = points.pop().unwrap();
+			let paths = self.find_paths(point, &points, &get_cost, neighborhood);
+			for (other, path) in paths {
+				let other_id = *to_visit
+					.iter()
+					.find(|id| all_nodes[id].pos == other)
+					.unwrap();
+
+				all_nodes.add_edge(id, other_id, PathSegment::new(path, config.cache_paths));
+			}
+		}
+	}
+
 	#[allow(dead_code)]
-	pub fn find_paths(
+	pub fn find_paths<N: Neighborhood>(
 		&self,
 		start: Point,
 		goals: &[Point],
 		get_cost: &Fn(Point) -> isize,
-		neighborhood: &impl Neighborhood,
+		neighborhood: &N,
 	) -> HashMap<Point, crate::generics::Path<Point>> {
 		crate::generics::dijkstra_search(
 			|p| {
-				let mut n = neighborhood.get_all_neighbors(p);
-				n.retain(|p| self.in_chunk(*p));
-				n
+				let cost = get_cost(p) as usize;
+				neighborhood
+					.get_all_neighbors(p)
+					.filter(|n| self.in_chunk(*n))
+					.map(move |n| (n, cost))
 			},
-			|p, _| get_cost(p) as usize,
 			|p| get_cost(p) >= 0,
 			start,
 			goals,
@@ -186,20 +201,21 @@ impl Chunk {
 	}
 
 	#[allow(dead_code)]
-	pub fn find_path(
+	pub fn find_path<N: Neighborhood>(
 		&self,
 		start: Point,
 		goal: Point,
 		get_cost: &Fn(Point) -> isize,
-		neighborhood: &impl Neighborhood,
+		neighborhood: &N,
 	) -> Option<crate::generics::Path<Point>> {
 		crate::generics::a_star_search(
 			|p| {
-				let mut n = neighborhood.get_all_neighbors(p);
-				n.retain(|p| self.in_chunk(*p));
-				n
+				let cost = get_cost(p) as usize;
+				neighborhood
+					.get_all_neighbors(p)
+					.filter(|n| self.in_chunk(*n))
+					.map(move |n| (n, cost))
 			},
-			|p, _| get_cost(p) as usize,
 			|p| get_cost(p) >= 0,
 			start,
 			goal,
@@ -208,27 +224,35 @@ impl Chunk {
 	}
 
 	pub fn in_chunk(&self, point: Point) -> bool {
-		point.0 >= self.pos.0
-			&& point.0 < self.pos.0 + self.size.0
-			&& point.1 >= self.pos.1
-			&& point.1 < self.pos.1 + self.size.1
+		point.0 >= self.left()
+			&& point.0 < self.right()
+			&& point.1 >= self.top()
+			&& point.1 < self.bottom()
 	}
-}
 
-fn get_in_dir(pos: Point, dir: usize, base: Point, (w, h): (usize, usize)) -> Option<Point> {
-	const UNIT_CIRCLE: [(isize, isize); 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
+	pub fn at_side(&self, point: Point, side: Dir) -> bool {
+		match side {
+			UP => point.1 == self.top(),
+			RIGHT => point.0 == self.right(),
+			DOWN => point.1 == self.bottom(),
+			LEFT => point.0 == self.left(),
+		}
+	}
 
-	let diff = UNIT_CIRCLE[dir];
-	if (pos.0 == base.0 && diff.0 < 0)
-		|| (pos.1 == base.1 && diff.1 < 0)
-		|| (pos.0 == base.0 + w - 1 && diff.0 > 0)
-		|| (pos.1 == base.1 + h - 1 && diff.1 > 0)
-	{
-		None
-	} else {
-		Some((
-			(pos.0 as isize + diff.0) as usize,
-			(pos.1 as isize + diff.1) as usize,
-		))
+	pub fn at_any_side(&self, point: Point) -> bool {
+		Dir::all().any(|dir| self.at_side(point, dir))
+	}
+
+	pub fn top(&self) -> usize {
+		self.pos.1
+	}
+	pub fn right(&self) -> usize {
+		self.pos.0 + self.size.0
+	}
+	pub fn bottom(&self) -> usize {
+		self.pos.1 + self.size.1
+	}
+	pub fn left(&self) -> usize {
+		self.pos.0
 	}
 }

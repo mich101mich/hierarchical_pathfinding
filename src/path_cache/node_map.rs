@@ -40,6 +40,13 @@ impl NodeMap {
 		let node = self.get_mut(&src).unwrap();
 		node.edges.insert(target, path);
 	}
+
+	pub fn remove_node(&mut self, id: NodeID) {
+		let node = self.remove(&id).unwrap();
+		for (other_id, _) in node.edges {
+			self.get_mut(&other_id).unwrap().edges.remove(&id);
+		}
+	}
 }
 
 use std::ops::{Deref, DerefMut};

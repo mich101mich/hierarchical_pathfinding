@@ -323,13 +323,21 @@
 //! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 //! # );
 //! #
-//! grid[3][1] = 0;
+//! let (start, goal) = ((0, 0), (2, 0));
+//!
+//! let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+//! assert!(path.is_none());
+//!
+//! grid[0][1] = 0;
 //! grid[4][4] = 2;
 //!
 //! pathfinding.tiles_changed(
-//!     &[(3, 1), (4, 4)],
+//!     &[(1, 0), (4, 4)],
 //!     cost_fn(&grid),
 //! );
+//!
+//! let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+//! assert!(path.is_some());
 //! ```
 //!
 //! ### Configuration

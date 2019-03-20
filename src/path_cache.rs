@@ -11,7 +11,6 @@ pub use self::cache_config::PathCacheConfig;
 
 mod abstract_path;
 pub use self::abstract_path::AbstractPath;
-use self::abstract_path::AbstractPathImpl;
 
 mod node_map;
 use self::node_map::NodeMap;
@@ -19,7 +18,11 @@ use self::node_map::NodeMap;
 mod path_segment;
 use self::path_segment::PathSegment;
 
-use std::collections::HashMap;
+mod utils;
+use self::utils::*;
+
+#[allow(unused_imports)]
+use std::collections::{HashMap, HashSet};
 
 /// A struct to store the Hierarchical Pathfinding information.
 #[derive(Clone, Debug)]
@@ -76,6 +79,7 @@ impl<N: Neighborhood> PathCache<N> {
 		neighborhood: N,
 		config: PathCacheConfig,
 	) -> PathCache<N> {
+		// calculate chunk size
 		let chunk_hor = {
 			let mut w = width / config.chunk_size;
 			if w * config.chunk_size < width {
@@ -93,6 +97,7 @@ impl<N: Neighborhood> PathCache<N> {
 
 		let mut nodes = NodeMap::new();
 
+		// create chunks
 		let mut chunks = Vec::with_capacity(chunk_hor);
 		for x in 0..chunk_hor {
 			let mut row = Vec::with_capacity(chunk_vert);
@@ -122,42 +127,19 @@ impl<N: Neighborhood> PathCache<N> {
 			chunks.push(row);
 		}
 
-		// connect neighboring Nodes across Chunk borders
-		let ids = nodes.keys().cloned().collect::<Vec<_>>();
-		for id in ids {
-			let pos = nodes[&id].pos;
-			let possible = neighborhood.get_all_neighbors(pos);
-			let neighbors = nodes
-				.values()
-				.filter(|node| possible.contains(&node.pos)) // any Node next to me
-				.filter(|node| !node.edges.contains_key(&id)) // that is not already connected
-				.map(|node| (node.id, node.pos))
-				.collect::<Vec<_>>();
-
-			for (other_id, other_pos) in neighbors {
-				let path = generics::Path::new(vec![pos, other_pos], get_cost(pos) as usize);
-				let other_path =
-					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
-
-				let node = nodes.get_mut(&id).unwrap();
-				node.edges
-					.insert(other_id, PathSegment::new(path, config.cache_paths));
-
-				let other_node = nodes.get_mut(&other_id).unwrap();
-				other_node
-					.edges
-					.insert(id, PathSegment::new(other_path, config.cache_paths));
-			}
-		}
-
-		PathCache {
+		let mut cache = PathCache {
 			width,
 			height,
 			chunks,
 			nodes,
 			config,
 			neighborhood,
-		}
+		};
+
+		// connect neighboring Nodes across Chunk borders
+		cache.connect_nodes(&get_cost);
+
+		cache
 	}
 
 	/// Calculates the Path from `start` to `goal` on the Grid.
@@ -345,7 +327,7 @@ impl<N: Neighborhood> PathCache<N> {
 		start: Point,
 		goal: Point,
 		get_cost: impl Fn(Point) -> isize,
-	) -> Option<impl AbstractPath> {
+	) -> Option<AbstractPath<N>> {
 		let start_id = self
 			.get_node_id(start)
 			.unwrap_or_else(|| self.add_node(start, &get_cost));
@@ -355,8 +337,12 @@ impl<N: Neighborhood> PathCache<N> {
 			.unwrap_or_else(|| self.add_node(goal, &get_cost));
 
 		let path = generics::a_star_search(
-			|id| self.nodes[&id].edges.keys().cloned().collect(),
-			|a, b| self.nodes[&a].edges[&b].cost(),
+			|id| {
+				self.nodes[&id]
+					.edges
+					.iter()
+					.map(|(id, path)| (*id, path.cost()))
+			},
 			|id| self.nodes[&id].walk_cost >= 0,
 			start_id,
 			goal_id,
@@ -371,8 +357,11 @@ impl<N: Neighborhood> PathCache<N> {
 
 			if self.config.a_star_fallback && length < 2 * self.config.chunk_size {
 				let path = generics::a_star_search(
-					|p| self.neighborhood.get_all_neighbors(p),
-					|p, _| get_cost(p) as usize,
+					|p| {
+						self.neighborhood
+							.get_all_neighbors(p)
+							.map(|n| (n, get_cost(n) as usize))
+					},
 					|p| get_cost(p) >= 0,
 					start,
 					goal,
@@ -380,9 +369,12 @@ impl<N: Neighborhood> PathCache<N> {
 				)
 				.expect("Internal Error in PathCache. Please report this");
 
-				Some(AbstractPathImpl::<N>::from_known_path(path))
+				Some(AbstractPath::<N>::from_known_path(
+					self.neighborhood.clone(),
+					path,
+				))
 			} else {
-				let mut ret = AbstractPathImpl::<N>::new(start);
+				let mut ret = AbstractPath::<N>::new(self.neighborhood.clone(), start);
 				for ids in path.windows(2) {
 					let path = &self.nodes[&ids[0]].edges[&ids[1]];
 					ret.add_path_segment(path.clone());
@@ -507,7 +499,7 @@ impl<N: Neighborhood> PathCache<N> {
 		start: Point,
 		goals: &[Point],
 		get_cost: impl Fn(Point) -> isize,
-	) -> HashMap<Point, impl AbstractPath> {
+	) -> HashMap<Point, AbstractPath<N>> {
 		let start_id = self
 			.get_node_id(start)
 			.unwrap_or_else(|| self.add_node(start, &get_cost));
@@ -518,11 +510,15 @@ impl<N: Neighborhood> PathCache<N> {
 				self.get_node_id(goal)
 					.unwrap_or_else(|| self.add_node(goal, &get_cost))
 			})
-			.collect::<Vec<_>>();
+			.to_vec();
 
 		let paths = generics::dijkstra_search(
-			|id| self.nodes[&id].edges.keys().cloned().collect(),
-			|a, b| self.nodes[&a].edges[&b].cost(),
+			|id| {
+				self.nodes[&id]
+					.edges
+					.iter()
+					.map(|(id, path)| (*id, path.cost()))
+			},
 			|id| self.nodes[&id].walk_cost >= 0,
 			start_id,
 			&goal_ids,
@@ -532,7 +528,7 @@ impl<N: Neighborhood> PathCache<N> {
 
 		for (&goal, id) in goals.iter().zip(goal_ids) {
 			if let Some(path) = paths.get(&id) {
-				let mut ret_path = AbstractPathImpl::<N>::new(start);
+				let mut ret_path = AbstractPath::<N>::new(self.neighborhood.clone(), start);
 				for ids in path.windows(2) {
 					let path = &self.nodes[&ids[0]].edges[&ids[1]];
 					ret_path.add_path_segment(path.clone());
@@ -542,6 +538,130 @@ impl<N: Neighborhood> PathCache<N> {
 		}
 
 		ret
+	}
+
+	/// ```
+	/// # use hierarchical_pathfinding::{prelude::*, Point};
+	/// #
+	/// # // create and initialize Grid
+	/// # // 0 = empty, 1 = swamp, 2 = wall
+	/// # let mut grid = [
+	/// #     [0, 2, 0, 0, 0],
+	/// #     [0, 2, 2, 2, 2],
+	/// #     [0, 1, 0, 0, 0],
+	/// #     [0, 1, 0, 2, 0],
+	/// #     [0, 0, 0, 2, 0],
+	/// # ];
+	/// # let (width, height) = (grid.len(), grid[0].len());
+	/// #
+	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
+	/// #
+	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// #     move |(x, y)| COST_MAP[grid[y][x]]
+	/// # }
+	/// #
+	/// # let mut pathfinding = PathCache::new(
+	/// #     (width, height),
+	/// #     cost_fn(&grid),
+	/// #     ManhattanNeighborhood::new(width, height),
+	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+	/// # );
+	/// #
+	/// let (start, goal) = ((0, 0), (2, 0));
+	///
+	/// let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+	/// assert!(path.is_none());
+	///
+	/// grid[0][1] = 0;
+	/// grid[4][4] = 2;
+	///
+	/// pathfinding.tiles_changed(
+	///     &[(1, 0), (4, 4)],
+	///     cost_fn(&grid),
+	/// );
+	///
+	/// let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+	/// assert!(path.is_some());
+	/// ```
+	pub fn tiles_changed(&mut self, tiles: &[Point], get_cost: impl Fn(Point) -> isize) {
+		let size = self.config.chunk_size;
+
+		let mut dirty = HashMap::new();
+		for &p in tiles {
+			let chunk_pos = self.get_chunk_pos(p);
+			dirty.entry(chunk_pos).or_insert_with(Vec::new).push(p);
+		}
+
+		// map of chunk_pos => array: [bool; 4] where array[side] == true if chunk[side] needs to be renewed
+		let mut renew = HashMap::new();
+
+		for (&cp, positions) in dirty.iter() {
+			let chunk = self.get_chunk(cp);
+			// for every changed tile in the chunk
+			for &p in positions {
+				// check every side that this tile is on
+				for dir in Dir::all().filter(|dir| chunk.at_side(p, *dir)) {
+					// if there is a chunk in that direction
+					if let Some(other_pos) =
+						jump_in_dir(cp, dir, size, (0, 0), (self.width, self.height))
+					{
+						// remove the current and other sides
+						renew.entry(cp).or_insert([false; 4])[dir.num()] = true;
+						renew.entry(other_pos).or_insert([false; 4])[dir.opposite().num()] = true;
+					}
+				}
+			}
+		}
+
+		for (&cp, sides) in renew.iter() {
+			// remove all non-border nodes
+			{
+				let chunk = self.get_chunk(cp);
+				let to_remove = chunk
+					.nodes
+					.iter()
+					.filter(|id| {
+						let pos = self.nodes[id].pos;
+						!chunk.at_any_side(pos)
+					})
+					.cloned()
+					.to_vec();
+
+				let chunk = &mut self.chunks[cp.0 / size][cp.0 / size];
+				for id in to_remove {
+					chunk.nodes.remove(&id);
+					self.nodes.remove_node(id);
+				}
+			}
+
+			// remove all nodes of sides in renew
+			let removed = {
+				let chunk = self.get_chunk(cp);
+				chunk
+					.nodes
+					.iter()
+					.filter(|id| {
+						let pos = self.nodes[id].pos;
+						Dir::all().any(|dir| sides[dir.num()] && chunk.at_side(pos, dir))
+					})
+					.cloned()
+					.to_vec()
+			};
+
+			let chunk = &mut self.chunks[cp.0 / size][cp.0 / size];
+
+			for id in removed {
+				chunk.nodes.remove(&id);
+				self.nodes.remove_node(id);
+			}
+		}
+
+		// TODO: recreate sides in renew
+
+		// TODO: reconnect inner-chunk-connections
+
+		// re-establish cross-chunk connections
+		self.connect_nodes(&get_cost);
 	}
 
 	#[allow(dead_code)]
@@ -598,11 +718,7 @@ impl<N: Neighborhood> PathCache<N> {
 				}
 			}
 		} else {
-			let positions = chunk
-				.nodes
-				.iter()
-				.map(|id| self.nodes[id].pos)
-				.collect::<Vec<_>>();
+			let positions = chunk.nodes.iter().map(|id| self.nodes[id].pos).to_vec();
 
 			let mut paths = chunk.find_paths(pos, &positions, &get_cost, &self.neighborhood);
 
@@ -618,14 +734,14 @@ impl<N: Neighborhood> PathCache<N> {
 		}
 
 		// add any direct neighbors
-		let possible = self.neighborhood.get_all_neighbors(pos);
+		let possible = self.neighborhood.get_all_neighbors(pos).to_vec();
 		let neighbors = self
 			.nodes
 			.values()
 			.filter(|node| possible.contains(&node.pos)) // any Node next to me
 			.filter(|node| !node.edges.contains_key(&id)) // that is not already connected
 			.map(|node| (node.id, node.pos))
-			.collect::<Vec<_>>();
+			.to_vec();
 
 		for (other_id, other_pos) in neighbors {
 			if cost >= 0 {
@@ -646,5 +762,52 @@ impl<N: Neighborhood> PathCache<N> {
 		}
 
 		id
+	}
+
+	fn connect_nodes(&mut self, get_cost: &Fn(Point) -> isize) {
+		let ids = self.nodes.keys().cloned().to_vec();
+		for id in ids {
+			let pos = self.nodes[&id].pos;
+			let possible = self.neighborhood.get_all_neighbors(pos).to_vec();
+			let neighbors = self
+				.nodes
+				.values()
+				.filter(|node| possible.contains(&node.pos)) // any Node next to me
+				.filter(|node| !node.edges.contains_key(&id)) // that is not already connected
+				.map(|node| (node.id, node.pos))
+				.to_vec();
+
+			for (other_id, other_pos) in neighbors {
+				let path = generics::Path::new(vec![pos, other_pos], get_cost(pos) as usize);
+				let other_path =
+					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
+
+				let node = self.nodes.get_mut(&id).unwrap();
+				node.edges
+					.insert(other_id, PathSegment::new(path, self.config.cache_paths));
+
+				let other_node = self.nodes.get_mut(&other_id).unwrap();
+				other_node
+					.edges
+					.insert(id, PathSegment::new(other_path, self.config.cache_paths));
+			}
+		}
+	}
+
+	#[allow(dead_code)]
+	fn top(&self) -> usize {
+		0
+	}
+	#[allow(dead_code)]
+	fn right(&self) -> usize {
+		self.width
+	}
+	#[allow(dead_code)]
+	fn bottom(&self) -> usize {
+		self.height
+	}
+	#[allow(dead_code)]
+	fn left(&self) -> usize {
+		0
 	}
 }
