@@ -6,9 +6,10 @@ edition = "2018"
 description = "A crate to quickly approximate Paths on a Grid."
 repository = "https://github.com/mich101mich/hierarchical_pathfinding"
 readme = "readme.md"
+license = "MIT"
 keywords = ["pathfinding", "dijkstra", "a-star", "grid"]
 categories = ["algorithms"]
-exclude = ["/.circleci/*", "/.travis.yml", "/.vscode/*", "todo.md"]
+exclude = ["/.circleci/*", "/.travis.yml", "/.vscode/*", "todo.md", ".gitignore"]
 
 [badges]
 travis-ci = { repository = "mich101mich/hierarchical_pathfinding" }
