@@ -341,13 +341,18 @@ impl<N: Neighborhood> PathCache<N> {
 		goal: Point,
 		get_cost: impl Fn(Point) -> isize,
 	) -> Option<AbstractPath<N>> {
-		let start_id = self
-			.get_node_id(start)
-			.unwrap_or_else(|| self.add_node(start, &get_cost));
+		let mut inserted_start = false;
+		let mut inserted_goal = false;
 
-		let goal_id = self
-			.get_node_id(goal)
-			.unwrap_or_else(|| self.add_node(goal, &get_cost));
+		let start_id = self.get_node_id(start).unwrap_or_else(|| {
+			inserted_start = true;
+			self.add_node(start, &get_cost)
+		});
+
+		let goal_id = self.get_node_id(goal).unwrap_or_else(|| {
+			inserted_goal = true;
+			self.add_node(goal, &get_cost)
+		});
 
 		let path = generics::a_star_search(
 			|id| {
@@ -367,6 +372,15 @@ impl<N: Neighborhood> PathCache<N> {
 				.windows(2)
 				.map(|ids| self.nodes[&ids[0]].edges[&ids[1]].len())
 				.sum();
+
+			if !self.config.keep_insertions {
+				if inserted_start {
+					self.nodes.remove_node(start_id);
+				}
+				if inserted_goal {
+					self.nodes.remove_node(goal_id);
+				}
+			}
 
 			if self.config.a_star_fallback && length < 2 * self.config.chunk_size {
 				let path = generics::a_star_search(
@@ -392,6 +406,16 @@ impl<N: Neighborhood> PathCache<N> {
 					let path = &self.nodes[&ids[0]].edges[&ids[1]];
 					ret.add_path_segment(path.clone());
 				}
+
+				if !self.config.keep_insertions {
+					if inserted_start {
+						self.nodes.remove_node(start_id);
+					}
+					if inserted_goal {
+						self.nodes.remove_node(goal_id);
+					}
+				}
+
 				Some(ret)
 			}
 		} else {
@@ -691,6 +715,7 @@ impl<N: Neighborhood> PathCache<N> {
 						chunk.size,
 						(self.width, self.height),
 						&get_cost,
+						&self.config,
 						&mut candidates,
 					);
 				}

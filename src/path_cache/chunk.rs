@@ -35,7 +35,15 @@ impl Chunk {
 			{
 				continue;
 			}
-			Chunk::calculate_side_nodes(dir, pos, size, total_size, &get_cost, &mut candidates);
+			Chunk::calculate_side_nodes(
+				dir,
+				pos,
+				size,
+				total_size,
+				&get_cost,
+				config,
+				&mut candidates,
+			);
 		}
 
 		let nodes: Vec<NodeID> = candidates
@@ -54,6 +62,7 @@ impl Chunk {
 		size: (usize, usize),
 		total_size: (usize, usize),
 		get_cost: impl Fn(Point) -> isize,
+		config: &PathCacheConfig,
 		candidates: &mut HashSet<Point>,
 	) {
 		let mut current = [
@@ -107,26 +116,35 @@ impl Chunk {
 				candidates.insert(gap_start_pos);
 				candidates.insert(gap_end_pos);
 
-				if gap_len > 2 {
-					let mut min = total_cost(gap_start_pos).min(total_cost(gap_end_pos));
+				if config.perfect_paths {
 					let mut p = gap_start_pos;
 					for _ in (gap_start + 1)..gap_end {
 						p = get_in_dir(p, next_dir, (0, 0), total_size)
-							.expect("Internal Error #2 in Chunk. Please report this");
-						let cost = total_cost(p);
-						if cost < min {
-							candidates.insert(p);
-							min = cost;
+							.expect("Internal Error #6 in Chunk. Please report this");
+						candidates.insert(p);
+					}
+				} else {
+					if gap_len > 2 {
+						let mut min = total_cost(gap_start_pos).min(total_cost(gap_end_pos));
+						let mut p = gap_start_pos;
+						for _ in (gap_start + 1)..gap_end {
+							p = get_in_dir(p, next_dir, (0, 0), total_size)
+								.expect("Internal Error #2 in Chunk. Please report this");
+							let cost = total_cost(p);
+							if cost < min {
+								candidates.insert(p);
+								min = cost;
+							}
 						}
 					}
-				}
 
-				if gap_len > 6 {
-					let mid = (
-						(gap_start_pos.0 + gap_end_pos.0) / 2,
-						(gap_start_pos.1 + gap_end_pos.1) / 2,
-					);
-					candidates.insert(mid);
+					if gap_len > 6 {
+						let mid = (
+							(gap_start_pos.0 + gap_end_pos.0) / 2,
+							(gap_start_pos.1 + gap_end_pos.1) / 2,
+						);
+						candidates.insert(mid);
+					}
 				}
 			}
 
