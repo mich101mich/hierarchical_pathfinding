@@ -9,7 +9,7 @@ readme = "readme.md"
 license = "MIT"
 keywords = ["pathfinding", "dijkstra", "a-star", "grid"]
 categories = ["algorithms"]
-exclude = ["/.circleci/*", "/.travis.yml", "/.vscode/*", "todo.md", ".gitignore"]
+exclude = ["/.circleci/*", "/.travis.yml", "/.vscode/*", "/todo.md", "/.gitignore", "/.github/*"]
 
 [badges]
 travis-ci = { repository = "mich101mich/hierarchical_pathfinding" }

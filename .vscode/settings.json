@@ -1,5 +1,8 @@
 {
 	"cSpell.words": [
 		"Neumann"
-	]
+	],
+	"files.exclude": {
+		"**/.github": true
+	}
 }
