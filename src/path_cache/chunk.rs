@@ -252,8 +252,8 @@ impl Chunk {
 	pub fn at_side(&self, point: Point, side: Dir) -> bool {
 		match side {
 			UP => point.1 == self.top(),
-			RIGHT => point.0 == self.right(),
-			DOWN => point.1 == self.bottom(),
+			RIGHT => point.0 == self.right() - 1,
+			DOWN => point.1 == self.bottom() - 1,
 			LEFT => point.0 == self.left(),
 		}
 	}

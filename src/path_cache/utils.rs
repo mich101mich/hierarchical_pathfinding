@@ -100,8 +100,8 @@ pub fn jump_in_dir(
 		&& res.0 < base.0 as isize + w as isize
 		&& res.1 < base.1 as isize + h as isize)
 	{
-		None
-	} else {
 		Some((res.0 as usize, res.1 as usize))
+	} else {
+		None
 	}
 }

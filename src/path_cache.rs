@@ -610,11 +610,19 @@ impl<N: Neighborhood> PathCache<N> {
 	/// let path = pathfinding.find_path(start, goal, cost_fn(&grid));
 	/// assert!(path.is_none());
 	///
-	/// grid[0][1] = 0;
-	/// grid[4][4] = 2;
+	/// grid[1][2] = 0;
+	/// grid[3][2] = 2;
+	///
+	/// assert_eq!(grid, [
+	///     [0, 2, 0, 0, 0],
+	///     [0, 2, 0, 2, 2],
+	///     [0, 1, 0, 0, 0],
+	///     [0, 1, 2, 2, 0],
+	///     [0, 0, 0, 2, 0],
+	/// ]);
 	///
 	/// pathfinding.tiles_changed(
-	///     &[(1, 0), (4, 4)],
+	///     &[(2, 1), (2, 3)],
 	///     cost_fn(&grid),
 	/// );
 	///
@@ -892,42 +900,3 @@ impl<N: Neighborhood> PathCache<N> {
 	}
 }
 
-#[test]
-fn renewal() {
-	use crate::prelude::*;
-	// create and initialize Grid
-	// 0 = empty, 1 = swamp, 2 = wall
-	let mut grid = [
-		[0, 2, 0, 0, 0],
-		[0, 2, 2, 2, 2],
-		[0, 1, 0, 0, 0],
-		[0, 1, 0, 2, 0],
-		[0, 0, 0, 2, 0],
-	];
-	let (width, height) = (grid.len(), grid[0].len());
-	const COST_MAP: [isize; 3] = [1, 10, -1];
-	fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
-		move |(x, y)| COST_MAP[grid[y][x]]
-	}
-	let mut pathfinding = PathCache::new(
-		(width, height),
-		cost_fn(&grid),
-		ManhattanNeighborhood::new(width, height),
-		PathCacheConfig {
-			chunk_size: 3,
-			..Default::default()
-		},
-	);
-	let (start, goal) = ((0, 0), (2, 0));
-
-	let path = pathfinding.find_path(start, goal, cost_fn(&grid));
-	assert!(path.is_none());
-
-	grid[1][2] = 0;
-	grid[4][4] = 2;
-
-	pathfinding.tiles_changed(&[(2, 1), (4, 4)], cost_fn(&grid));
-
-	let path = pathfinding.find_path(start, goal, cost_fn(&grid));
-	assert!(path.is_some());
-}
