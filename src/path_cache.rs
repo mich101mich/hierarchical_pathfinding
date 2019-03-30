@@ -578,6 +578,18 @@ impl<N: Neighborhood> PathCache<N> {
 		ret
 	}
 
+	/// Notifies the PathCache that the Grid changed.
+	///
+	/// This Method updates any internal Paths that might have changed when the Grid changed. This
+	/// is an expensive operation and should only be performed if the change affected the walking
+	/// cost of a tile and the PathCache is needed again. If possible, try to bundle as many
+	/// changes as possible into a single call to `tiles_changed` to avoid unnecessary
+	/// recalculations.
+	///
+	/// Side note: if anybody has a way to improve this method, open a GitHub Issue / Pull Request.
+	///
+	/// ## Examples
+	/// Basic usage:
 	/// ```
 	/// # use hierarchical_pathfinding::{prelude::*, Point};
 	/// #
