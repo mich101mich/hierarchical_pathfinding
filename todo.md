@@ -4,7 +4,7 @@
 - [x] use PathCacheConfig where necessary
 - [x] document AbstractPath
 - [ ] check all documentation for consistency
-- [ ] visualization/debug adapters
+- [x] visualization/debug adapters
 - [x] store length of Path alongside Cost
 - maybe: more tests
 - maybe: benchmark performance/memory

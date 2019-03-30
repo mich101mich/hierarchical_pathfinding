@@ -774,6 +774,62 @@ impl<N: Neighborhood> PathCache<N> {
 		self.connect_nodes(&get_cost);
 	}
 
+	/// Allows for debugging and visualizing the PathCache
+	///
+	/// The returned object gives read-only access to the current state of the PathCache, mainly the
+	/// Nodes and how they are connected to each other
+	///
+	/// ## Examples
+	/// Basic usage:
+	/// ```
+	/// # use hierarchical_pathfinding::{prelude::*, Point};
+	/// # use std::collections::HashSet;
+	/// #
+	/// # // create and initialize Grid
+	/// # // 0 = empty, 1 = swamp, 2 = wall
+	/// # let mut grid = [
+	/// #     [0, 2, 0, 0, 0],
+	/// #     [0, 2, 2, 2, 2],
+	/// #     [0, 1, 0, 0, 0],
+	/// #     [0, 1, 0, 2, 0],
+	/// #     [0, 0, 0, 2, 0],
+	/// # ];
+	/// # let (width, height) = (grid.len(), grid[0].len());
+	/// #
+	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
+	/// #
+	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// #     move |(x, y)| COST_MAP[grid[y][x]]
+	/// # }
+	/// #
+	/// # let mut pathfinding = PathCache::new(
+	/// #     (width, height),
+	/// #     cost_fn(&grid),
+	/// #     ManhattanNeighborhood::new(width, height),
+	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+	/// # );
+	/// #
+	/// // create PathCache
+	///
+	/// // only draw the connections between Nodes once
+	/// let mut visited = HashSet::new();
+	///
+	/// for node in pathfinding.inspect_nodes() {
+	///     let pos = node.pos();
+	///     // draw Node at x: pos.0, y: pos.1
+	///
+	///     visited.insert(node.id());
+	///     
+	///     for neighbor in node.connected().filter(|n| !visited.contains(&n.id())) {
+	///         let other_pos = neighbor.pos();
+	///         // draw Line from pos to other_pos
+	///     }
+	/// }
+	/// ```
+	pub fn inspect_nodes(&self) -> CacheInspector<N> {
+		CacheInspector::new(self)
+	}
+
 	#[allow(dead_code)]
 	fn get_chunk_pos(&self, point: Point) -> Point {
 		let size = self.config.chunk_size;
@@ -912,3 +968,68 @@ impl<N: Neighborhood> PathCache<N> {
 	}
 }
 
+#[derive(Debug)]
+pub struct CacheInspector<'a, N: Neighborhood> {
+	src: &'a PathCache<N>,
+	nodes: Vec<NodeID>,
+	current_index: usize,
+}
+
+impl<'a, N: Neighborhood> CacheInspector<'a, N> {
+	pub fn new(src: &'a PathCache<N>) -> Self {
+		CacheInspector {
+			src,
+			nodes: src.nodes.keys().cloned().to_vec(),
+			current_index: 0,
+		}
+	}
+
+	pub fn get_node(&self, id: NodeID) -> NodeInspector<N> {
+		NodeInspector::new(self.src, id)
+	}
+}
+
+impl<'a, N: Neighborhood> Iterator for CacheInspector<'a, N> {
+	type Item = NodeInspector<'a, N>;
+	fn next(&mut self) -> Option<Self::Item> {
+		let ret = self
+			.nodes
+			.get(self.current_index)
+			.map(|id| NodeInspector::new(self.src, *id));
+
+		if self.current_index < self.nodes.len() {
+			self.current_index += 1;
+		}
+		ret
+	}
+}
+
+#[derive(Debug)]
+pub struct NodeInspector<'a, N: Neighborhood> {
+	src: &'a PathCache<N>,
+	node: &'a Node,
+}
+
+impl<'a, N: Neighborhood> NodeInspector<'a, N> {
+	pub fn new(src: &'a PathCache<N>, id: NodeID) -> Self {
+		NodeInspector {
+			src,
+			node: &src.nodes[&id],
+		}
+	}
+
+	pub fn pos(&self) -> Point {
+		self.node.pos
+	}
+
+	pub fn id(&self) -> NodeID {
+		self.node.id
+	}
+
+	pub fn connected(&'a self) -> impl Iterator<Item = NodeInspector<'a, N>> + 'a {
+		self.node
+			.edges
+			.keys()
+			.map(move |id| NodeInspector::new(self.src, *id))
+	}
+}
