@@ -8,7 +8,7 @@ repository = "https://github.com/mich101mich/hierarchical_pathfinding"
 readme = "readme.md"
 keywords = ["pathfinding", "dijkstra", "a-star", "grid"]
 categories = ["algorithms"]
-exclude = ["/.circleci/*", "/.travis.yml", "/.vscode/*"]
+exclude = ["/.circleci/*", "/.travis.yml", "/.vscode/*", "todo.md"]
 
 [badges]
 travis-ci = { repository = "mich101mich/hierarchical_pathfinding" }

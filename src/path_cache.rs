@@ -12,6 +12,7 @@ pub use self::cache_config::PathCacheConfig;
 mod abstract_path;
 pub use self::abstract_path::AbstractPath;
 
+#[macro_use]
 mod node_map;
 use self::node_map::NodeMap;
 
@@ -33,6 +34,18 @@ pub struct PathCache<N: Neighborhood> {
 	nodes: NodeMap,
 	neighborhood: N,
 	config: PathCacheConfig,
+}
+
+// this is a macro so that it only borrows self.chunks instead of self
+macro_rules! get_chunk {
+	($obj: ident, $point: ident) => {
+		&$obj.chunks[$point.0 / $obj.config.chunk_size][$point.1 / $obj.config.chunk_size]
+	};
+}
+macro_rules! get_chunk_mut {
+	($obj: ident, $point: ident) => {
+		&mut $obj.chunks[$point.0 / $obj.config.chunk_size][$point.1 / $obj.config.chunk_size]
+	};
 }
 
 impl<N: Neighborhood> PathCache<N> {
@@ -367,7 +380,7 @@ impl<N: Neighborhood> PathCache<N> {
 					goal,
 					|p| self.neighborhood.heuristic(p, goal),
 				)
-				.expect("Internal Error in PathCache. Please report this");
+				.expect("Internal Error #1 in PathCache. Please report this");
 
 				Some(AbstractPath::<N>::from_known_path(
 					self.neighborhood.clone(),
@@ -596,7 +609,7 @@ impl<N: Neighborhood> PathCache<N> {
 		let mut renew = HashMap::new();
 
 		for (&cp, positions) in dirty.iter() {
-			let chunk = self.get_chunk(cp);
+			let chunk = get_chunk!(self, cp);
 			// for every changed tile in the chunk
 			for &p in positions {
 				// check every side that this tile is on
@@ -616,7 +629,7 @@ impl<N: Neighborhood> PathCache<N> {
 		for (&cp, sides) in renew.iter() {
 			// remove all non-border nodes
 			{
-				let chunk = self.get_chunk(cp);
+				let chunk = get_chunk!(self, cp);
 				let to_remove = chunk
 					.nodes
 					.iter()
@@ -627,7 +640,7 @@ impl<N: Neighborhood> PathCache<N> {
 					.cloned()
 					.to_vec();
 
-				let chunk = &mut self.chunks[cp.0 / size][cp.0 / size];
+				let chunk = get_chunk_mut!(self, cp);
 				for id in to_remove {
 					chunk.nodes.remove(&id);
 					self.nodes.remove_node(id);
@@ -636,7 +649,7 @@ impl<N: Neighborhood> PathCache<N> {
 
 			// remove all nodes of sides in renew
 			let removed = {
-				let chunk = self.get_chunk(cp);
+				let chunk = get_chunk!(self, cp);
 				chunk
 					.nodes
 					.iter()
@@ -648,7 +661,7 @@ impl<N: Neighborhood> PathCache<N> {
 					.to_vec()
 			};
 
-			let chunk = &mut self.chunks[cp.0 / size][cp.0 / size];
+			let chunk = get_chunk_mut!(self, cp);
 
 			for id in removed {
 				chunk.nodes.remove(&id);
@@ -656,9 +669,60 @@ impl<N: Neighborhood> PathCache<N> {
 			}
 		}
 
-		// TODO: recreate sides in renew
+		// remove all Paths in changed chunks
+		for cp in dirty.keys() {
+			let chunk = get_chunk!(self, cp);
+			for id in chunk.nodes.iter() {
+				let node = self.nodes.get_mut(id).unwrap_or_else(invalid_id!());
+				node.edges.clear();
+			}
+		}
 
-		// TODO: reconnect inner-chunk-connections
+		// recreate sides in renew
+		for (&cp, sides) in renew.iter() {
+			let mut candidates = HashSet::new();
+			let chunk = get_chunk_mut!(self, cp);
+
+			for dir in Dir::all() {
+				if sides[dir.num()] {
+					Chunk::calculate_side_nodes(
+						dir,
+						cp,
+						chunk.size,
+						(self.width, self.height),
+						&get_cost,
+						&mut candidates,
+					);
+				}
+			}
+
+			let all_nodes = &self.nodes;
+			candidates.retain(|&p| all_nodes.values().find(|node| node.pos == p).is_none());
+
+			let all_nodes = &mut self.nodes;
+			let nodes = candidates
+				.into_iter()
+				.map(|p| all_nodes.add_node(p, get_cost(p)));
+
+			for id in nodes {
+				chunk.nodes.insert(id);
+			}
+		}
+
+		// recreate Paths
+		for cp in dirty.keys() {
+			let chunk = get_chunk_mut!(self, cp);
+			let nodes = chunk.nodes.iter().cloned().collect();
+			chunk.nodes.clear();
+
+			chunk.add_nodes(
+				nodes,
+				&get_cost,
+				&self.neighborhood,
+				&mut self.nodes,
+				&self.config,
+			);
+		}
 
 		// re-establish cross-chunk connections
 		self.connect_nodes(&get_cost);
@@ -668,16 +732,6 @@ impl<N: Neighborhood> PathCache<N> {
 	fn get_chunk_pos(&self, point: Point) -> Point {
 		let size = self.config.chunk_size;
 		((point.0 / size) * size, (point.1 / size) * size)
-	}
-	#[allow(dead_code)]
-	fn get_chunk(&self, point: Point) -> &Chunk {
-		let size = self.config.chunk_size;
-		&self.chunks[point.0 / size][point.1 / size]
-	}
-	#[allow(dead_code)]
-	fn get_chunk_mut(&mut self, point: Point) -> &mut Chunk {
-		let size = self.config.chunk_size;
-		&mut self.chunks[point.0 / size][point.1 / size]
 	}
 
 	#[allow(dead_code)]
@@ -746,7 +800,7 @@ impl<N: Neighborhood> PathCache<N> {
 		for (other_id, other_pos) in neighbors {
 			if cost >= 0 {
 				let path = generics::Path::new(vec![pos, other_pos], get_cost(pos) as usize);
-				let node = self.nodes.get_mut(&id).unwrap();
+				let node = self.nodes.get_mut(&id).unwrap_or_else(invalid_id!());
 				node.edges
 					.insert(other_id, PathSegment::new(path, self.config.cache_paths));
 			}
@@ -754,7 +808,7 @@ impl<N: Neighborhood> PathCache<N> {
 				let other_path =
 					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
 
-				let other_node = self.nodes.get_mut(&other_id).unwrap();
+				let other_node = self.nodes.get_mut(&other_id).unwrap_or_else(invalid_id!());
 				other_node
 					.edges
 					.insert(id, PathSegment::new(other_path, self.config.cache_paths));
@@ -782,11 +836,11 @@ impl<N: Neighborhood> PathCache<N> {
 				let other_path =
 					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
 
-				let node = self.nodes.get_mut(&id).unwrap();
+				let node = self.nodes.get_mut(&id).unwrap_or_else(invalid_id!());
 				node.edges
 					.insert(other_id, PathSegment::new(path, self.config.cache_paths));
 
-				let other_node = self.nodes.get_mut(&other_id).unwrap();
+				let other_node = self.nodes.get_mut(&other_id).unwrap_or_else(invalid_id!());
 				other_node
 					.edges
 					.insert(id, PathSegment::new(other_path, self.config.cache_paths));
@@ -810,4 +864,44 @@ impl<N: Neighborhood> PathCache<N> {
 	fn left(&self) -> usize {
 		0
 	}
+}
+
+#[test]
+fn renewal() {
+	use crate::prelude::*;
+	// create and initialize Grid
+	// 0 = empty, 1 = swamp, 2 = wall
+	let mut grid = [
+		[0, 2, 0, 0, 0],
+		[0, 2, 2, 2, 2],
+		[0, 1, 0, 0, 0],
+		[0, 1, 0, 2, 0],
+		[0, 0, 0, 2, 0],
+	];
+	let (width, height) = (grid.len(), grid[0].len());
+	const COST_MAP: [isize; 3] = [1, 10, -1];
+	fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+		move |(x, y)| COST_MAP[grid[y][x]]
+	}
+	let mut pathfinding = PathCache::new(
+		(width, height),
+		cost_fn(&grid),
+		ManhattanNeighborhood::new(width, height),
+		PathCacheConfig {
+			chunk_size: 3,
+			..Default::default()
+		},
+	);
+	let (start, goal) = ((0, 0), (2, 0));
+
+	let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+	assert!(path.is_none());
+
+	grid[1][2] = 0;
+	grid[4][4] = 2;
+
+	pathfinding.tiles_changed(&[(2, 1), (4, 4)], cost_fn(&grid));
+
+	let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+	assert!(path.is_some());
 }

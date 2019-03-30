@@ -1,9 +1,11 @@
 # TODO
-- [ ] update the cache when the Grid changes
+- [x] update the cache when the Grid changes
 - [ ] use RC in paths
 - [ ] use PathCacheConfig where necessary
-- [ ] document AbstractPath
+- [x] document AbstractPath
 - [ ] check all documentation for consistency
-- maybe: store length of Path alongside Cost
+- [ ] visualization/debug adapters
+- [x] store length of Path alongside Cost
 - maybe: more tests
 - maybe: benchmark performance/memory
+- maybe: add converts for AbstractPath for safe and known stuff

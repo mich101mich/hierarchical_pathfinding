@@ -27,12 +27,6 @@ impl Chunk {
 
 		let mut candidates = HashSet::new();
 
-		// always have corners if possible
-		candidates.insert(pos);
-		candidates.insert((pos.0, pos.1 + size.1 - 1));
-		candidates.insert((pos.0 + size.0 - 1, pos.1));
-		candidates.insert((pos.0 + size.0 - 1, pos.1 + size.1 - 1));
-
 		for dir in Dir::all() {
 			if dir == UP && chunk.top() == 0
 				|| dir == RIGHT && chunk.right() == total_size.0
@@ -46,9 +40,7 @@ impl Chunk {
 
 		let nodes: Vec<NodeID> = candidates
 			.into_iter()
-			.map(|p| (p, get_cost(p)))
-			.filter(|(_, cost)| *cost >= 0)
-			.map(|(p, cost)| all_nodes.add_node(p, cost))
+			.map(|p| all_nodes.add_node(p, get_cost(p)))
 			.collect();
 
 		chunk.add_nodes(nodes, &get_cost, neighborhood, all_nodes, config);
@@ -56,7 +48,7 @@ impl Chunk {
 		chunk
 	}
 
-	fn calculate_side_nodes(
+	pub fn calculate_side_nodes(
 		dir: Dir,
 		base_pos: Point,
 		size: (usize, usize),
@@ -83,7 +75,10 @@ impl Chunk {
 			return;
 		}
 
-		let opposite = |p: Point| get_in_dir(p, dir, (0, 0), total_size).unwrap();
+		let opposite = |p: Point| {
+			get_in_dir(p, dir, (0, 0), total_size)
+				.expect("Internal Error #1 in Chunk. Please report this")
+		};
 		let total_cost = |p: Point| get_cost(p) + get_cost(opposite(p));
 
 		let mut has_gap = false;
@@ -116,7 +111,8 @@ impl Chunk {
 					let mut min = total_cost(gap_start_pos).min(total_cost(gap_end_pos));
 					let mut p = gap_start_pos;
 					for _ in (gap_start + 1)..gap_end {
-						p = get_in_dir(p, next_dir, (0, 0), total_size).unwrap();
+						p = get_in_dir(p, next_dir, (0, 0), total_size)
+							.expect("Internal Error #2 in Chunk. Please report this");
 						let cost = total_cost(p);
 						if cost < min {
 							candidates.insert(p);
@@ -136,7 +132,8 @@ impl Chunk {
 
 			if !is_last {
 				previous = current;
-				current = get_in_dir(current, next_dir, base_pos, size).unwrap();
+				current = get_in_dir(current, next_dir, base_pos, size)
+					.expect("Internal Error #3 in Chunk. Please report this");
 			}
 		}
 	}
@@ -152,7 +149,7 @@ impl Chunk {
 		let mut points = self
 			.nodes
 			.iter()
-			.chain(to_visit.iter())
+			.chain(to_visit.iter()) // results in to_visit points at the end => enables pop()
 			.map(|id| all_nodes[id].pos)
 			.to_vec();
 
@@ -165,13 +162,17 @@ impl Chunk {
 			if to_visit.is_empty() {
 				break;
 			}
-			let point = points.pop().unwrap();
+			let point = points
+				.pop()
+				.expect("Internal Error #4 in Chunk. Please report this");
+
 			let paths = self.find_paths(point, &points, &get_cost, neighborhood);
-			for (other, path) in paths {
+
+			for (other_pos, path) in paths {
 				let other_id = *to_visit
 					.iter()
-					.find(|id| all_nodes[id].pos == other)
-					.unwrap();
+					.find(|id| all_nodes[id].pos == other_pos)
+					.expect("Internal Error #5 in Chunk. Please report this");
 
 				all_nodes.add_edge(id, other_id, PathSegment::new(path, config.cache_paths));
 			}

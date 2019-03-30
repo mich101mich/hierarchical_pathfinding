@@ -2,6 +2,12 @@ use super::{path_segment::PathSegment, Node};
 use crate::{NodeID, Point};
 use std::collections::HashMap;
 
+macro_rules! invalid_id {
+	() => {
+		|| panic!("Invalid NodeID in {}:{}", file!(), line!())
+	};
+}
+
 #[derive(Clone, Debug)]
 pub struct NodeMap {
 	nodes: HashMap<NodeID, Node>,
@@ -33,18 +39,21 @@ impl NodeMap {
 
 		if target_cost >= 0 {
 			let other_path = path.reversed(src_cost as usize, target_cost as usize);
-			let node = self.get_mut(&target).unwrap();
+			let node = self.get_mut(&target).unwrap_or_else(invalid_id!());
 			node.edges.insert(src, other_path);
 		}
 
-		let node = self.get_mut(&src).unwrap();
+		let node = self.get_mut(&src).unwrap_or_else(invalid_id!());
 		node.edges.insert(target, path);
 	}
 
 	pub fn remove_node(&mut self, id: NodeID) {
-		let node = self.remove(&id).unwrap();
+		let node = self.remove(&id).unwrap_or_else(invalid_id!());
 		for (other_id, _) in node.edges {
-			self.get_mut(&other_id).unwrap().edges.remove(&id);
+			self.get_mut(&other_id)
+				.unwrap_or_else(invalid_id!())
+				.edges
+				.remove(&id);
 		}
 	}
 }
