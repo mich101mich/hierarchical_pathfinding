@@ -367,28 +367,20 @@ impl<N: Neighborhood> PathCache<N> {
 			|id| self.neighborhood.heuristic(self.nodes[&id].pos, goal),
 		);
 
-		if let Some(path) = path {
+		let final_path = if let Some(path) = path {
 			let length: usize = path
 				.iter()
 				.zip(path.iter().skip(1))
 				.map(|(a, b)| self.nodes[&a].edges[&b].len())
 				.sum();
 
-			if !self.config.keep_insertions {
-				if inserted_start {
-					self.nodes.remove_node(start_id);
-				}
-				if inserted_goal {
-					self.nodes.remove_node(goal_id);
-				}
-			}
-
 			if self.config.a_star_fallback && length < 2 * self.config.chunk_size {
 				let path = generics::a_star_search(
 					|p| {
+						let cost = get_cost(p) as usize;
 						self.neighborhood
 							.get_all_neighbors(p)
-							.map(|n| (n, get_cost(n) as usize))
+							.map(move |n| (n, cost))
 					},
 					|p| get_cost(p) >= 0,
 					start,
@@ -408,20 +400,22 @@ impl<N: Neighborhood> PathCache<N> {
 					ret.add_path_segment(path.clone());
 				}
 
-				if !self.config.keep_insertions {
-					if inserted_start {
-						self.nodes.remove_node(start_id);
-					}
-					if inserted_goal {
-						self.nodes.remove_node(goal_id);
-					}
-				}
-
 				Some(ret)
 			}
 		} else {
 			None
+		};
+
+		if !self.config.keep_insertions {
+			if inserted_start {
+				self.nodes.remove_node(start_id);
+			}
+			if inserted_goal {
+				self.nodes.remove_node(goal_id);
+			}
 		}
+
+		final_path
 	}
 
 	/// Calculates the Paths from one `start` to several `goals` on the Grid.
@@ -658,41 +652,38 @@ impl<N: Neighborhood> PathCache<N> {
 			// for every changed tile in the chunk
 			for &p in positions {
 				// check every side that this tile is on
-				for dir in Dir::all().filter(|dir| chunk.at_side(p, *dir)) {
+				for dir in Dir::all().filter(|dir| chunk.sides[dir.num()] && chunk.at_side(p, *dir))
+				{
 					// if there is a chunk in that direction
-					if let Some(other_pos) =
-						jump_in_dir(cp, dir, size, (0, 0), (self.width, self.height))
-					{
-						// remove the current and other sides
-						renew.entry(cp).or_insert([false; 4])[dir.num()] = true;
-						renew.entry(other_pos).or_insert([false; 4])[dir.opposite().num()] = true;
-					}
+					let other_pos = jump_in_dir(cp, dir, size, (0, 0), (self.width, self.height))
+						.expect("Internal Error #2 in PathCache. Please report this");
+
+					// remove the current and other sides
+					renew.entry(cp).or_insert([false; 4])[dir.num()] = true;
+					renew.entry(other_pos).or_insert([false; 4])[dir.opposite().num()] = true;
 				}
+			}
+
+			// remove all non-border nodes
+			let to_remove = chunk
+				.nodes
+				.iter()
+				.filter(|id| {
+					let pos = self.nodes[id].pos;
+					!chunk.at_any_side(pos)
+				})
+				.cloned()
+				.to_vec();
+
+			let chunk = get_chunk_mut!(self, cp);
+			for id in to_remove {
+				chunk.nodes.remove(&id);
+				self.nodes.remove_node(id);
 			}
 		}
 
+		// remove all nodes of sides in renew
 		for (&cp, sides) in renew.iter() {
-			// remove all non-border nodes
-			{
-				let chunk = get_chunk!(self, cp);
-				let to_remove = chunk
-					.nodes
-					.iter()
-					.filter(|id| {
-						let pos = self.nodes[id].pos;
-						!chunk.at_any_side(pos)
-					})
-					.cloned()
-					.to_vec();
-
-				let chunk = get_chunk_mut!(self, cp);
-				for id in to_remove {
-					chunk.nodes.remove(&id);
-					self.nodes.remove_node(id);
-				}
-			}
-
-			// remove all nodes of sides in renew
 			let removed = {
 				let chunk = get_chunk!(self, cp);
 				chunk
@@ -730,10 +721,8 @@ impl<N: Neighborhood> PathCache<N> {
 
 			for dir in Dir::all() {
 				if sides[dir.num()] {
-					Chunk::calculate_side_nodes(
+					chunk.calculate_side_nodes(
 						dir,
-						cp,
-						chunk.size,
 						(self.width, self.height),
 						&get_cost,
 						&self.config,
@@ -745,20 +734,35 @@ impl<N: Neighborhood> PathCache<N> {
 			let all_nodes = &self.nodes;
 			candidates.retain(|&p| all_nodes.values().find(|node| node.pos == p).is_none());
 
+			if candidates.is_empty() {
+				continue;
+			}
+
 			let all_nodes = &mut self.nodes;
 			let nodes = candidates
 				.into_iter()
-				.map(|p| all_nodes.add_node(p, get_cost(p)));
+				.map(|p| all_nodes.add_node(p, get_cost(p)))
+				.to_vec();
 
-			for id in nodes {
-				chunk.nodes.insert(id);
+			if !dirty.contains_key(&cp) {
+				chunk.add_nodes(
+					nodes,
+					&get_cost,
+					&self.neighborhood,
+					&mut self.nodes,
+					&self.config,
+				);
+			} else {
+				for id in nodes {
+					chunk.nodes.insert(id);
+				}
 			}
 		}
 
 		// recreate Paths
 		for cp in dirty.keys() {
 			let chunk = get_chunk_mut!(self, cp);
-			let nodes = chunk.nodes.iter().cloned().collect();
+			let nodes = chunk.nodes.iter().cloned().to_vec();
 			chunk.nodes.clear();
 
 			chunk.add_nodes(
@@ -831,6 +835,19 @@ impl<N: Neighborhood> PathCache<N> {
 	}
 
 	#[allow(dead_code)]
+	fn print_nodes(&self) {
+		for node in self.inspect_nodes() {
+			print!("{} at {:?}: ", node.id(), node.pos());
+
+			for neighbor in node.connected() {
+				print!("{:?}, ", neighbor.pos());
+			}
+
+			println!();
+		}
+	}
+
+	#[allow(dead_code)]
 	fn get_chunk_pos(&self, point: Point) -> Point {
 		let size = self.config.chunk_size;
 		((point.0 / size) * size, (point.1 / size) * size)
@@ -853,12 +870,10 @@ impl<N: Neighborhood> PathCache<N> {
 		let cost = get_cost(pos);
 		let id = self.nodes.add_node(pos, cost);
 
-		let size = self.config.chunk_size;
-		let chunk = &self.chunks[pos.0 / size][pos.1 / size];
-		let nodes: Vec<NodeID> = chunk.nodes.iter().cloned().collect();
+		let chunk = get_chunk!(self, pos);
 
 		if cost < 0 {
-			for other_id in nodes {
+			for &other_id in chunk.nodes.iter() {
 				let other_node = &self.nodes[&other_id];
 
 				if other_node.walk_cost < 0 {
@@ -873,20 +888,18 @@ impl<N: Neighborhood> PathCache<N> {
 					);
 				}
 			}
+
+			let chunk = get_chunk_mut!(self, pos);
+			chunk.nodes.insert(id);
 		} else {
-			let positions = chunk.nodes.iter().map(|id| self.nodes[id].pos).to_vec();
-
-			let mut paths = chunk.find_paths(pos, &positions, &get_cost, &self.neighborhood);
-
-			for (other_id, pos) in chunk.nodes.iter().zip(positions.iter()) {
-				if let Some(path) = paths.remove(pos) {
-					self.nodes.add_edge(
-						id,
-						*other_id,
-						PathSegment::new(path, self.config.cache_paths),
-					);
-				}
-			}
+			let chunk = get_chunk_mut!(self, pos);
+			chunk.add_nodes(
+				vec![id],
+				&get_cost,
+				&self.neighborhood,
+				&mut self.nodes,
+				&self.config,
+			);
 		}
 
 		// add any direct neighbors

@@ -92,16 +92,34 @@ pub fn jump_in_dir(
 	base: Point,
 	(w, h): (usize, usize),
 ) -> Option<Point> {
+	let dist = dist as isize;
+	let left = base.0 as isize;
+	let right = (base.0 + w) as isize;
+	let top = base.1 as isize;
+	let bottom = (base.1 + h) as isize;
+
 	let diff = UNIT_CIRCLE[dir.num()];
-	let diff = (diff.0 * dist as isize, diff.0 * dist as isize);
-	let res = (pos.0 as isize + diff.0, pos.1 as isize + diff.1);
-	if (res.0 >= base.0 as isize
-		&& res.1 >= base.1 as isize
-		&& res.0 < base.0 as isize + w as isize
-		&& res.1 < base.1 as isize + h as isize)
-	{
+	let res = (
+		pos.0 as isize + diff.0 * dist,
+		pos.1 as isize + diff.1 * dist,
+	);
+	if (res.0 >= left && res.0 < right && res.1 >= top && res.1 < bottom) {
 		Some((res.0 as usize, res.1 as usize))
 	} else {
 		None
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn jump_test() {
+		let pos = (1, 3);
+		assert_eq!(jump_in_dir(pos, UP, 2, (0, 0), (5, 5)), Some((1, 1)));
+		assert_eq!(jump_in_dir(pos, RIGHT, 2, (0, 0), (5, 5)), Some((3, 3)));
+		assert_eq!(jump_in_dir(pos, DOWN, 2, (0, 0), (5, 5)), None);
+		assert_eq!(jump_in_dir(pos, LEFT, 2, (0, 0), (5, 5)), None);
 	}
 }

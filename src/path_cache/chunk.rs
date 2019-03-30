@@ -7,6 +7,7 @@ pub struct Chunk {
 	pub pos: Point,
 	pub size: Point,
 	pub nodes: HashSet<NodeID>,
+	pub sides: [bool; 4],
 }
 
 impl Chunk {
@@ -23,6 +24,7 @@ impl Chunk {
 			pos,
 			size,
 			nodes: HashSet::new(),
+			sides: [false; 4],
 		};
 
 		let mut candidates = HashSet::new();
@@ -35,21 +37,15 @@ impl Chunk {
 			{
 				continue;
 			}
-			Chunk::calculate_side_nodes(
-				dir,
-				pos,
-				size,
-				total_size,
-				&get_cost,
-				config,
-				&mut candidates,
-			);
+			chunk.sides[dir.num()] = true;
+
+			chunk.calculate_side_nodes(dir, total_size, &get_cost, config, &mut candidates);
 		}
 
 		let nodes: Vec<NodeID> = candidates
 			.into_iter()
 			.map(|p| all_nodes.add_node(p, get_cost(p)))
-			.collect();
+			.to_vec();
 
 		chunk.add_nodes(nodes, &get_cost, neighborhood, all_nodes, config);
 
@@ -57,24 +53,23 @@ impl Chunk {
 	}
 
 	pub fn calculate_side_nodes(
+		&self,
 		dir: Dir,
-		base_pos: Point,
-		size: (usize, usize),
 		total_size: (usize, usize),
 		get_cost: impl Fn(Point) -> isize,
 		config: &PathCacheConfig,
 		candidates: &mut HashSet<Point>,
 	) {
 		let mut current = [
-			(base_pos.0, base_pos.1),
-			(base_pos.0 + size.0 - 1, base_pos.1),
-			(base_pos.0, base_pos.1 + size.1 - 1),
-			(base_pos.0, base_pos.1),
+			(self.pos.0, self.pos.1),
+			(self.pos.0 + self.size.0 - 1, self.pos.1),
+			(self.pos.0, self.pos.1 + self.size.1 - 1),
+			(self.pos.0, self.pos.1),
 		][dir.num()];
 		let (next_dir, length) = if dir.is_vertical() {
-			(RIGHT, size.0)
+			(RIGHT, self.size.0)
 		} else {
-			(DOWN, size.1)
+			(DOWN, self.size.1)
 		};
 		// 0 == up: start at top-left, go right
 		// 1 == right: start at top-right, go down
@@ -150,7 +145,7 @@ impl Chunk {
 
 			if !is_last {
 				previous = current;
-				current = get_in_dir(current, next_dir, base_pos, size)
+				current = get_in_dir(current, next_dir, self.pos, self.size)
 					.expect("Internal Error #3 in Chunk. Please report this");
 			}
 		}
@@ -177,9 +172,6 @@ impl Chunk {
 
 		// connect every Node to every other Node
 		while let Some(id) = to_visit.pop() {
-			if to_visit.is_empty() {
-				break;
-			}
 			let point = points
 				.pop()
 				.expect("Internal Error #4 in Chunk. Please report this");
@@ -187,9 +179,10 @@ impl Chunk {
 			let paths = self.find_paths(point, &points, &get_cost, neighborhood);
 
 			for (other_pos, path) in paths {
-				let other_id = *to_visit
+				let other_id = *all_nodes
 					.iter()
-					.find(|id| all_nodes[id].pos == other_pos)
+					.find(|(_, node)| node.pos == other_pos)
+					.map(|(id, _)| id)
 					.expect("Internal Error #5 in Chunk. Please report this");
 
 				all_nodes.add_edge(id, other_id, PathSegment::new(path, config.cache_paths));
@@ -259,7 +252,7 @@ impl Chunk {
 	}
 
 	pub fn at_any_side(&self, point: Point) -> bool {
-		Dir::all().any(|dir| self.at_side(point, dir))
+		Dir::all().any(|dir| self.sides[dir.num()] && self.at_side(point, dir))
 	}
 
 	pub fn top(&self) -> usize {
