@@ -1,16 +1,21 @@
 use super::Cost;
+use std::rc::Rc;
 
 /// A generic implementation of a Path
 ///
-/// Stores a sequence of Nodes in `path` and the total Cost of traversing these Nodes in `cost`.
-/// Note that the individual costs of the steps within the Path cannot be retrieved through this struct.
+/// Stores a sequence of Nodes and the total Cost of traversing these Nodes.
+/// Note that the individual costs of the steps within the Path cannot be retrieved through this
+/// struct.
+///
+/// This struct does not own the actual Path, it merely keeps an [`Rc`] to it. This makes cloning
+/// and reversing very efficient, but makes them immutable and limits some ways to access the
+/// contents
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(missing_doc_code_examples)]
 pub struct Path<P> {
-	/// the Path
-	pub path: Vec<P>,
-	/// the total Cost of the Path
-	pub cost: Cost,
+	path: Rc<Vec<P>>,
+	cost: Cost,
+	is_reversed: bool,
 }
 
 impl<P> Path<P> {
@@ -21,34 +26,39 @@ impl<P> Path<P> {
 	/// # use hierarchical_pathfinding::generics::Path;
 	/// let path = Path::new(vec!['a', 'b', 'c'], 42);
 	///
-	/// assert_eq!(path.path, vec!['a', 'b', 'c']);
-	/// assert_eq!(path.cost, 42);
+	/// assert_eq!(path, vec!['a', 'b', 'c']);
+	/// assert_eq!(path.cost(), 42);
 	/// ```
 	pub fn new(path: Vec<P>, cost: Cost) -> Path<P> {
-		Path { path, cost }
+		Path {
+			path: Rc::new(path),
+			cost,
+			is_reversed: false,
+		}
 	}
 
-	/// appends a Node to the Path, adding it's Cost to the total Cost
-	/// ## Examples
-	/// Basic usage:
-	/// ```
-	/// # use hierarchical_pathfinding::generics::Path;
-	/// let mut path = Path::new(vec!['a', 'b', 'c'], 42);
-	/// path.append('d', 5);
+	/// Returns the Cost of the Path
+	pub fn cost(&self) -> Cost {
+		self.cost
+	}
+
+	/// Returns the length of the Path
+	pub fn len(&self) -> usize {
+		self.path.len()
+	}
+
+	/// Returns if the Path is empty
+	pub fn is_empty(&self) -> bool {
+		self.path.is_empty()
+	}
+
+	/// Returns a reversed version of the Path.
 	///
-	/// assert_eq!(path.path, vec!['a', 'b', 'c', 'd']);
-	/// assert_eq!(path.cost, 47);
-	/// ```
-	pub fn append(&mut self, node: P, cost: Cost) -> &mut Self {
-		self.path.push(node);
-		self.cost += cost;
-		self
-	}
-
-	/// Returns a reversed copy of the Path.
-	/// 
 	/// `start_cost` is what need to be subtracted, and `end_cost` is what needs to be
-	/// added to the cost in the case of asymmetric paths. Can be set to 0 for symmetric paths. 
+	/// added to the cost in the case of asymmetric paths. Can be set to 0 for symmetric paths.
+	///
+	/// This operation is low cost since Paths are based on [`Rc`]s.
+	///
 	/// ## Examples
 	/// Basic usage:
 	/// ```
@@ -56,32 +66,71 @@ impl<P> Path<P> {
 	/// let path = Path::new(vec!['a', 'b', 'c'], 42);
 	/// let reversed = path.reversed(5, 2);
 	///
-	/// assert_eq!(reversed.path, vec!['c', 'b', 'a']);
-	/// assert_eq!(reversed.cost, 39);
+	/// assert_eq!(reversed, vec!['c', 'b', 'a']);
+	/// assert_eq!(reversed.cost(), 39);
 	/// ```
 	pub fn reversed(&self, start_cost: Cost, end_cost: Cost) -> Path<P>
 	where
 		P: Clone,
 	{
-		let mut path = self.path.clone();
-		path.reverse();
-		Path::new(path, self.cost - start_cost + end_cost)
+		Path {
+			path: self.path.clone(),
+			cost: self.cost - start_cost + end_cost,
+			is_reversed: !self.is_reversed,
+		}
+	}
+
+	/// Returns an Iterator over the Path
+	pub fn iter(&self) -> Iter<P> {
+		Iter {
+			iter: self.path.iter(),
+			reversed: self.is_reversed,
+		}
+	}
+
+	/// Extracts a Vec from the Path, cloning the data
+	pub fn as_vec(&self) -> Vec<P>
+	where
+		P: Clone,
+	{
+		self.iter().cloned().collect()
 	}
 }
 
-use std::ops::{Deref, Index};
+use std::ops::Index;
 
 impl<P> Index<usize> for Path<P> {
 	type Output = P;
 	fn index(&self, index: usize) -> &P {
+		let index = if self.is_reversed {
+			self.path.len() - index - 1
+		} else {
+			index
+		};
 		&self.path[index]
 	}
 }
 
-impl<P> Deref for Path<P> {
-	type Target = [P];
-	fn deref(&self) -> &[P] {
-		&self.path
+#[derive(Debug)]
+pub struct Iter<'a, P> {
+	iter: std::slice::Iter<'a, P>,
+	reversed: bool,
+}
+
+impl<'a, P> Iterator for Iter<'a, P> {
+	type Item = &'a P;
+	fn next(&mut self) -> Option<&'a P> {
+		if self.reversed {
+			self.iter.next_back()
+		} else {
+			self.iter.next()
+		}
+	}
+}
+
+impl<P: Eq> PartialEq<Vec<P>> for Path<P> {
+	fn eq(&self, rhs: &Vec<P>) -> bool {
+		self.len() == rhs.len() && self.iter().zip(rhs.iter()).all(|(a, b)| a == b)
 	}
 }
 

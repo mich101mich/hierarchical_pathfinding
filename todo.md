@@ -1,6 +1,6 @@
 # TODO
 - [x] update the cache when the Grid changes
-- [ ] use RC in paths
+- [x] use RC in paths
 - [x] use PathCacheConfig where necessary
 - [x] document AbstractPath
 - [ ] check all documentation for consistency

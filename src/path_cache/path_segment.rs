@@ -24,7 +24,7 @@ impl PathSegment {
 			Unknown {
 				start: path[0],
 				end: path[path.len() - 1],
-				cost: path.cost,
+				cost: path.cost(),
 				len: path.len(),
 			}
 		}
@@ -32,7 +32,7 @@ impl PathSegment {
 
 	pub fn cost(&self) -> Cost {
 		match *self {
-			Known(ref path) => path.cost,
+			Known(ref path) => path.cost(),
 			Unknown { cost, .. } => cost,
 		}
 	}

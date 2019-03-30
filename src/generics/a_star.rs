@@ -49,8 +49,8 @@ use std::hash::Hash;
 /// assert!(result.is_some());
 /// let path = result.unwrap();
 ///
-/// assert_eq!(path.path, vec![A, C, D]);
-/// assert_eq!(path.cost, 7);
+/// assert_eq!(path, vec![A, C, D]);
+/// assert_eq!(path.cost(), 7);
 /// ```
 ///
 /// If the Goal cannot be reached, None is returned:

@@ -124,7 +124,7 @@ impl<N: Neighborhood> AbstractPath<N> {
 		let end = path[path.len() - 1];
 		AbstractPath {
 			neighborhood: neighborhood,
-			total_cost: path.cost,
+			total_cost: path.cost(),
 			total_length: path.len(),
 			path: vec![Known(path)],
 			end,
@@ -153,7 +153,7 @@ impl<N: Neighborhood> AbstractPath<N> {
 	}
 
 	pub(crate) fn add_path(&mut self, path: Path<Point>) -> &mut Self {
-		self.total_cost += path.cost;
+		self.total_cost += path.cost();
 		self.total_length += path.len();
 		self.end = path[path.len() - 1];
 		self.path.push(Known(path));

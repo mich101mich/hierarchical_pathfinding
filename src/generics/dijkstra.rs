@@ -48,8 +48,8 @@ use std::hash::Hash;
 /// // if the Goal is reachable, the Path is added to the Map
 /// assert!(result.contains_key(&D));
 /// let path = &result[&D];
-/// assert_eq!(path.path, vec![A, C, D]);
-/// assert_eq!(path.cost, 7);
+/// assert_eq!(*path, vec![A, C, D]);
+/// assert_eq!(path.cost(), 7);
 ///
 /// // if the Goal is not reachable, there won't be an entry in the Map
 /// assert!(!result.contains_key(&E));

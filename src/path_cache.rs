@@ -369,8 +369,9 @@ impl<N: Neighborhood> PathCache<N> {
 
 		if let Some(path) = path {
 			let length: usize = path
-				.windows(2)
-				.map(|ids| self.nodes[&ids[0]].edges[&ids[1]].len())
+				.iter()
+				.zip(path.iter().skip(1))
+				.map(|(a, b)| self.nodes[&a].edges[&b].len())
 				.sum();
 
 			if !self.config.keep_insertions {
@@ -402,8 +403,8 @@ impl<N: Neighborhood> PathCache<N> {
 				))
 			} else {
 				let mut ret = AbstractPath::<N>::new(self.neighborhood.clone(), start);
-				for ids in path.windows(2) {
-					let path = &self.nodes[&ids[0]].edges[&ids[1]];
+				for (a, b) in path.iter().zip(path.iter().skip(1)) {
+					let path = &self.nodes[&a].edges[&b];
 					ret.add_path_segment(path.clone());
 				}
 
@@ -566,8 +567,8 @@ impl<N: Neighborhood> PathCache<N> {
 		for (&goal, id) in goals.iter().zip(goal_ids) {
 			if let Some(path) = paths.get(&id) {
 				let mut ret_path = AbstractPath::<N>::new(self.neighborhood.clone(), start);
-				for ids in path.windows(2) {
-					let path = &self.nodes[&ids[0]].edges[&ids[1]];
+				for (a, b) in path.iter().zip(path.iter().skip(1)) {
+					let path = &self.nodes[&a].edges[&b];
 					ret_path.add_path_segment(path.clone());
 				}
 				ret.insert(goal, ret_path);
