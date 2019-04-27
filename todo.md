@@ -6,6 +6,7 @@
 - [ ] check all documentation for consistency
 - [x] visualization/debug adapters
 - [x] store length of Path alongside Cost
+- [ ] properly remove nodes in find_path and find_paths
 - maybe: more tests
 - maybe: benchmark performance/memory
 - maybe: add converts for AbstractPath for safe and known stuff

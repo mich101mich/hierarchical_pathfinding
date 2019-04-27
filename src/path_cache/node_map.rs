@@ -32,19 +32,34 @@ impl NodeMap {
 	}
 
 	pub fn add_edge(&mut self, src: NodeID, target: NodeID, path: PathSegment) {
-		let src_cost = self[&src].walk_cost;
-		let target_cost = self[&target].walk_cost;
-
+		let (src_pos, src_cost) = {
+			let node = &self[&src];
+			(node.pos, node.walk_cost)
+		};
 		assert!(src_cost >= 0, "Cannot add Path from solid Node");
+
+		let target_node = self.get_mut(&target).unwrap_or_else(invalid_id!());
+
+		let target_pos = target_node.pos;
+		let target_cost = target_node.walk_cost;
 
 		if target_cost >= 0 {
 			let other_path = path.reversed(src_cost as usize, target_cost as usize);
-			let node = self.get_mut(&target).unwrap_or_else(invalid_id!());
-			node.edges.insert(src, other_path);
+			target_node.edges.insert(src, other_path);
+		} else {
+			target_node.edges.insert(
+				src,
+				PathSegment::Unknown {
+					start: src_pos,
+					end: target_pos,
+					cost: std::usize::MAX,
+					len: std::usize::MAX,
+				},
+			);
 		}
 
-		let node = self.get_mut(&src).unwrap_or_else(invalid_id!());
-		node.edges.insert(target, path);
+		let src_node = self.get_mut(&src).unwrap_or_else(invalid_id!());
+		src_node.edges.insert(target, path);
 	}
 
 	pub fn remove_node(&mut self, id: NodeID) {
