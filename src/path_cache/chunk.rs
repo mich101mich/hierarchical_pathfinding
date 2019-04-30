@@ -18,7 +18,7 @@ impl Chunk {
 		get_cost: impl Fn(Point) -> isize,
 		neighborhood: &N,
 		all_nodes: &mut NodeMap,
-		config: &PathCacheConfig,
+		config: PathCacheConfig,
 	) -> Chunk {
 		let mut chunk = Chunk {
 			pos,
@@ -57,7 +57,7 @@ impl Chunk {
 		dir: Dir,
 		total_size: (usize, usize),
 		get_cost: impl Fn(Point) -> isize,
-		config: &PathCacheConfig,
+		config: PathCacheConfig,
 		candidates: &mut HashSet<Point>,
 	) {
 		let mut current = [
@@ -157,7 +157,7 @@ impl Chunk {
 		get_cost: &Fn(Point) -> isize,
 		neighborhood: &N,
 		all_nodes: &mut NodeMap,
-		config: &PathCacheConfig,
+		config: PathCacheConfig,
 	) {
 		let mut points = self
 			.nodes

@@ -111,7 +111,7 @@ impl<N: Neighborhood> AbstractPath<N> {
 
 	pub(crate) fn new(neighborhood: N, start: Point) -> AbstractPath<N> {
 		AbstractPath {
-			neighborhood: neighborhood,
+			neighborhood,
 			total_cost: 0,
 			total_length: 0,
 			path: vec![],
@@ -123,7 +123,7 @@ impl<N: Neighborhood> AbstractPath<N> {
 	pub(crate) fn from_known_path(neighborhood: N, path: Path<Point>) -> AbstractPath<N> {
 		let end = path[path.len() - 1];
 		AbstractPath {
-			neighborhood: neighborhood,
+			neighborhood,
 			total_cost: path.cost(),
 			total_length: path.len(),
 			path: vec![Known(path)],
@@ -134,7 +134,7 @@ impl<N: Neighborhood> AbstractPath<N> {
 
 	pub(crate) fn from_node(neighborhood: N, node: Point) -> AbstractPath<N> {
 		AbstractPath {
-			neighborhood: neighborhood,
+			neighborhood,
 			total_cost: 0,
 			total_length: 0,
 			path: vec![],

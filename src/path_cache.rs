@@ -133,7 +133,7 @@ impl<N: Neighborhood> PathCache<N> {
 					&get_cost,
 					&neighborhood,
 					&mut nodes,
-					&config,
+					config,
 				))
 			}
 
@@ -725,7 +725,7 @@ impl<N: Neighborhood> PathCache<N> {
 						dir,
 						(self.width, self.height),
 						&get_cost,
-						&self.config,
+						self.config,
 						&mut candidates,
 					);
 				}
@@ -750,7 +750,7 @@ impl<N: Neighborhood> PathCache<N> {
 					&get_cost,
 					&self.neighborhood,
 					&mut self.nodes,
-					&self.config,
+					self.config,
 				);
 			} else {
 				for id in nodes {
@@ -770,7 +770,7 @@ impl<N: Neighborhood> PathCache<N> {
 				&get_cost,
 				&self.neighborhood,
 				&mut self.nodes,
-				&self.config,
+				self.config,
 			);
 		}
 
@@ -898,7 +898,7 @@ impl<N: Neighborhood> PathCache<N> {
 				&get_cost,
 				&self.neighborhood,
 				&mut self.nodes,
-				&self.config,
+				self.config,
 			);
 		}
 
