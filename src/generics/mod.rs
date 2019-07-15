@@ -10,19 +10,19 @@ pub use self::path::Path;
 /// Implementation of A* and Dijkstra for Grids
 pub mod grid {
 	mod a_star;
-	pub use a_star::a_star_search;
+	pub use self::a_star::a_star_search;
 
 	mod dijkstra;
-	pub use dijkstra::dijkstra_search;
+	pub use self::dijkstra::dijkstra_search;
 }
 
 /// Implementation of A* and Dijkstra for Graphs
 pub mod graph {
 	mod a_star;
-	pub use a_star::a_star_search;
+	pub use self::a_star::a_star_search;
 
 	mod dijkstra;
-	pub use dijkstra::dijkstra_search;
+	pub use self::dijkstra::dijkstra_search;
 }
 
 /// a Type to represent the Cost of traversing a Node
