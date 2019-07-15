@@ -1,4 +1,4 @@
-use super::{ordered_insert, Cost, Path};
+use super::super::{ordered_insert, Cost, Path};
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -11,80 +11,79 @@ use std::hash::Hash;
 /// ## Examples
 /// Basic usage:
 /// ```
-/// # use hierarchical_pathfinding::generics::a_star_search;
-/// // A     B--2--E
-/// // |\     
-/// // | \    
-/// // 1  9   
-/// // |   \  
-/// // |    \
-/// // C--6--D
-/// let (A, B, C, D, E) = (0, 1, 2, 3, 4);
-/// let cost_matrix: [[i32; 5]; 5] = [
-/// //    A,  B,  C,  D,  E
-/// 	[-1, -1,  1,  9, -1], // A
-/// 	[-1, -1, -1, -1,  2], // B
-/// 	[ 1, -1, -1,  6, -1], // C
-/// 	[ 9, -1,  6, -1, -1], // D
-/// 	[-1,  2, -1, -1, -1], // E
+/// # use hierarchical_pathfinding::generics::grid::a_star_search;
+/// # use hierarchical_pathfinding::{prelude::*, Point};
+/// // create and initialize Grid
+/// // 0 = empty, 1 = swamp, 2 = wall
+/// let mut grid = [
+///     [0, 2, 0, 0, 0],
+///     [0, 2, 2, 2, 2],
+///     [0, 1, 0, 0, 0],
+///     [0, 1, 0, 2, 0],
+///     [0, 0, 0, 2, 0],
 /// ];
-/// # fn euclid_distance(a: usize, b: usize) -> usize {
-/// # 	  [[0, 1, 1, 2, 2], [1, 0, 2, 1, 1], [1, 2, 0, 1, 3], [2, 1, 1, 0, 2], [2, 1, 3, 2, 0]][a][b]
-/// # }
+/// let (width, height) = (grid.len(), grid[0].len());
 ///
-/// let result = a_star_search(
-/// 	|point| { // get_all_neighbors
-/// 		cost_matrix[point]
-/// 			.iter()
-/// 			.enumerate()
-/// 			.filter(|&(_, cost)| *cost != -1)
-/// 			.map(|(id, cost)| (id, *cost as usize))
-/// 	},
-/// 	|_| true, // is_walkable
-/// 	A, // start
-/// 	D, // goal
-/// 	|point| euclid_distance(point, D), // heuristic
+/// let neighborhood = ManhattanNeighborhood::new(width, height);
+///
+/// const COST_MAP: [isize; 3] = [1, 10, -1];
+///
+/// fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
+///     move |(x, y)| COST_MAP[grid[y][x]]
+/// }
+///
+/// let start = (0, 0);
+/// let goal = (4, 4);
+///
+/// let path = a_star_search(
+///     |point| neighborhood.get_all_neighbors(point),
+///     cost_fn(&grid),
+///     start,
+///     goal,
+///     |point| neighborhood.heuristic(point, goal),
 /// );
 ///
-/// assert!(result.is_some());
-/// let path = result.unwrap();
+/// assert!(path.is_some());
+/// let path = path.unwrap();
 ///
-/// assert_eq!(path, vec![A, C, D]);
-/// assert_eq!(path.cost(), 7);
+/// assert_eq!(path.cost(), 12);
 /// ```
 ///
 /// If the Goal cannot be reached, None is returned:
 /// ```
-/// # use hierarchical_pathfinding::generics::a_star_search;
-/// # let (A, B, C, D, E) = (0, 1, 2, 3, 4);
-/// # let cost_matrix: [[i32; 5]; 5] = [
-/// # //    A,  B,  C,  D,  E
-/// #     [-1, -1,  1,  9, -1], // A
-/// #     [-1, -1, -1, -1,  2], // B
-/// #     [ 1, -1, -1,  6, -1], // C
-/// #     [ 9, -1,  6, -1, -1], // D
-/// #     [-1,  2, -1, -1, -1], // E
+/// # use hierarchical_pathfinding::generics::grid::a_star_search;
+/// # use hierarchical_pathfinding::{prelude::*, Point};
+/// # // create and initialize Grid
+/// # // 0 = empty, 1 = swamp, 2 = wall
+/// # let mut grid = [
+/// #     [0, 2, 0, 0, 0],
+/// #     [0, 2, 2, 2, 2],
+/// #     [0, 1, 0, 0, 0],
+/// #     [0, 1, 0, 2, 0],
+/// #     [0, 0, 0, 2, 0],
 /// # ];
-/// # fn euclid_distance(a: usize, b: usize) -> usize {
-/// # 	  [[0, 1, 1, 2, 2], [1, 0, 2, 1, 1], [1, 2, 0, 1, 3], [2, 1, 1, 0, 2], [2, 1, 3, 2, 0]][a][b]
+/// # let (width, height) = (grid.len(), grid[0].len());
+/// #
+/// # let neighborhood = ManhattanNeighborhood::new(width, height);
+/// #
+/// # const COST_MAP: [isize; 3] = [1, 10, -1];
+/// #
+/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
+/// #     move |(x, y)| COST_MAP[grid[y][x]]
 /// # }
 /// #
-/// # let result = a_star_search(
-/// #    |point| { // get_all_neighbors
-/// #        cost_matrix[point]
-/// #            .iter()
-/// #            .enumerate()
-/// #            .filter(|&(_, cost)| *cost != -1)
-/// #            .map(|(id, cost)| (id, *cost as usize))
-/// #    },
-/// #    |_| true, // is_walkable
-/// // ...
-///     A, // start
-///     E, // goal
-/// 	|point| euclid_distance(point, E), // heuristic
+/// let start = (0, 0);
+/// let goal = (2, 0);
+///
+/// let path = a_star_search(
+///     |point| neighborhood.get_all_neighbors(point),
+///     cost_fn(&grid),
+///     start,
+///     goal,
+///     |point| neighborhood.heuristic(point, goal),
 /// );
 ///
-/// assert_eq!(result, None);
+/// assert!(path.is_none());
 /// ```
 ///
 /// ## Solid Goals
@@ -98,8 +97,9 @@ use std::hash::Hash;
 ///
 /// ## Arguments
 /// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node.
-/// 	The returned value is a Tuple of the `Id` of the neighbor and the Cost to get there.
-/// - `is_walkable` - a Function that determines if a Node can be walked over. see [Solid Goals](#solid-goals) for more info
+///     The returned value is the `Id` of the neighbor.
+/// - `get_cost` - a Function that takes a Node and returns the Cost required to walk across that Node.
+///     Negative values indicate Nodes that cannot be walked across.
 /// - `start` - the starting Node
 /// - `goal` - the Goal that this function is supposed to search for
 /// - `heuristic` - the Heuristic Function of the A* Algorithm
@@ -107,12 +107,12 @@ use std::hash::Hash;
 /// ## Returns
 /// the Path, if one was found, or None if the `goal` is unreachable.
 /// The first Node in the Path is always the `start` and the last is the `goal`
-pub fn a_star_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = (Id, Cost)>>(
-	get_all_neighbors: impl Fn(Id) -> NeighborIter,
-	is_walkable: impl Fn(Id) -> bool,
+pub fn a_star_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = Id>>(
+	mut get_all_neighbors: impl FnMut(Id) -> NeighborIter,
+	mut get_cost: impl FnMut(Id) -> isize,
 	start: Id,
 	goal: Id,
-	heuristic: impl Fn(Id) -> Cost,
+	mut heuristic: impl FnMut(Id) -> Cost,
 ) -> Option<Path<Id>> {
 	if start == goal {
 		return Some(Path::new(vec![start, start], 0));
@@ -127,10 +127,16 @@ pub fn a_star_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = (Id, Co
 		}
 		let current_cost = visited[&current_id].0;
 
-		for (other_id, delta_cost) in get_all_neighbors(current_id) {
+		let delta_cost = get_cost(current_id);
+		if delta_cost < 0 {
+			continue;
+		}
+		let delta_cost = delta_cost as usize;
+
+		for other_id in get_all_neighbors(current_id) {
 			let other_cost = current_cost + delta_cost;
 
-			if !is_walkable(other_id) && other_id != goal {
+			if get_cost(other_id) < 0 && other_id != goal {
 				continue;
 			}
 

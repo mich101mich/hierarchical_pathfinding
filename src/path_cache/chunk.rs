@@ -15,7 +15,7 @@ impl Chunk {
 		pos: Point,
 		size: (usize, usize),
 		total_size: (usize, usize),
-		get_cost: impl Fn(Point) -> isize,
+		mut get_cost: impl FnMut(Point) -> isize,
 		neighborhood: &N,
 		all_nodes: &mut NodeMap,
 		config: PathCacheConfig,
@@ -39,7 +39,7 @@ impl Chunk {
 			}
 			chunk.sides[dir.num()] = true;
 
-			chunk.calculate_side_nodes(dir, total_size, &get_cost, config, &mut candidates);
+			chunk.calculate_side_nodes(dir, total_size, &mut get_cost, config, &mut candidates);
 		}
 
 		let nodes: Vec<NodeID> = candidates
@@ -47,7 +47,7 @@ impl Chunk {
 			.map(|p| all_nodes.add_node(p, get_cost(p)))
 			.to_vec();
 
-		chunk.add_nodes(nodes, &get_cost, neighborhood, all_nodes, config);
+		chunk.add_nodes(nodes, &mut get_cost, neighborhood, all_nodes, config);
 
 		chunk
 	}
@@ -56,7 +56,7 @@ impl Chunk {
 		&self,
 		dir: Dir,
 		total_size: (usize, usize),
-		get_cost: impl Fn(Point) -> isize,
+		mut get_cost: impl FnMut(Point) -> isize,
 		config: PathCacheConfig,
 		candidates: &mut HashSet<Point>,
 	) {
@@ -83,7 +83,23 @@ impl Chunk {
 			get_in_dir(p, dir, (0, 0), total_size)
 				.expect("Internal Error #1 in Chunk. Please report this")
 		};
-		let total_cost = |p: Point| get_cost(p) + get_cost(opposite(p));
+
+		let costs = (0..length)
+			.map(|i| {
+				jump_in_dir(current, next_dir, i, self.pos, self.size)
+					.expect("Internal Error #3 in Chunk. Please report this")
+			})
+			.map(|p| (get_cost(p), get_cost(opposite(p))))
+			.to_vec();
+
+		let solid = |i: usize| {
+			let (c1, c2) = &costs[i];
+			*c1 < 0 || *c2 < 0
+		};
+		let total_cost = |i: usize| {
+			let (c1, c2) = &costs[i];
+			*c1 + *c2
+		};
 
 		let mut has_gap = false;
 		let mut gap_start = 0;
@@ -92,7 +108,8 @@ impl Chunk {
 
 		for i in 0..length {
 			let is_last = i == length - 1;
-			let solid = get_cost(current) < 0 || get_cost(opposite(current)) < 0;
+			let solid = solid(i);
+
 			if !solid && !has_gap {
 				has_gap = true;
 				gap_start = i;
@@ -120,12 +137,12 @@ impl Chunk {
 					}
 				} else {
 					if gap_len > 2 {
-						let mut min = total_cost(gap_start_pos).min(total_cost(gap_end_pos));
+						let mut min = total_cost(gap_start).min(total_cost(gap_end));
 						let mut p = gap_start_pos;
-						for _ in (gap_start + 1)..gap_end {
+						for gi in (gap_start + 1)..gap_end {
 							p = get_in_dir(p, next_dir, (0, 0), total_size)
 								.expect("Internal Error #2 in Chunk. Please report this");
-							let cost = total_cost(p);
+							let cost = total_cost(gi);
 							if cost < min {
 								candidates.insert(p);
 								min = cost;
@@ -154,7 +171,7 @@ impl Chunk {
 	pub fn add_nodes<N: Neighborhood>(
 		&mut self,
 		mut to_visit: Vec<NodeID>,
-		get_cost: &Fn(Point) -> isize,
+		mut get_cost: impl FnMut(Point) -> isize,
 		neighborhood: &N,
 		all_nodes: &mut NodeMap,
 		config: PathCacheConfig,
@@ -176,7 +193,7 @@ impl Chunk {
 				.pop()
 				.expect("Internal Error #4 in Chunk. Please report this");
 
-			let paths = self.find_paths(point, &points, &get_cost, neighborhood);
+			let paths = self.find_paths(point, &points, &mut get_cost, neighborhood);
 
 			for (other_pos, path) in paths {
 				let other_id = *all_nodes
@@ -195,18 +212,16 @@ impl Chunk {
 		&self,
 		start: Point,
 		goals: &[Point],
-		get_cost: &Fn(Point) -> isize,
+		get_cost: impl FnMut(Point) -> isize,
 		neighborhood: &N,
 	) -> HashMap<Point, crate::generics::Path<Point>> {
-		crate::generics::dijkstra_search(
+		crate::generics::grid::dijkstra_search(
 			|p| {
-				let cost = get_cost(p) as usize;
 				neighborhood
 					.get_all_neighbors(p)
 					.filter(|n| self.in_chunk(*n))
-					.map(move |n| (n, cost))
 			},
-			|p| get_cost(p) >= 0,
+			get_cost,
 			start,
 			goals,
 		)
@@ -217,18 +232,16 @@ impl Chunk {
 		&self,
 		start: Point,
 		goal: Point,
-		get_cost: &Fn(Point) -> isize,
+		get_cost: impl FnMut(Point) -> isize,
 		neighborhood: &N,
 	) -> Option<crate::generics::Path<Point>> {
-		crate::generics::a_star_search(
+		crate::generics::grid::a_star_search(
 			|p| {
-				let cost = get_cost(p) as usize;
 				neighborhood
 					.get_all_neighbors(p)
 					.filter(|n| self.in_chunk(*n))
-					.map(move |n| (n, cost))
 			},
-			|p| get_cost(p) >= 0,
+			get_cost,
 			start,
 			goal,
 			|p| neighborhood.heuristic(p, goal),

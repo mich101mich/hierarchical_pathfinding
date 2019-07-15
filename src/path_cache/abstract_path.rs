@@ -1,6 +1,6 @@
 use super::path_segment::{PathSegment, PathSegment::*};
 use crate::{
-	generics::{a_star_search, Cost, Path},
+	generics::{grid::a_star_search, Cost, Path},
 	neighbors::Neighborhood,
 	Point,
 };
@@ -48,19 +48,15 @@ impl<N: Neighborhood> AbstractPath<N> {
 	/// A variant of [`Iterator::next()`](#impl-Iterator) that can resolve unknown segments
 	/// of the Path. Use this method instead of `next()` when
 	/// [`config.cache_paths`](super::PathCacheConfig::cache_paths) is set to false.
-	pub fn safe_next(&mut self, get_cost: impl Fn(Point) -> isize) -> Option<Point> {
+	pub fn safe_next(&mut self, get_cost: impl FnMut(Point) -> isize) -> Option<Point> {
 		if self.current_index.0 >= self.path.len() {
 			return None;
 		}
 		let mut current = &self.path[self.current_index.0];
 		if let Unknown { start, end, .. } = *current {
 			let path = a_star_search(
-				|p| {
-					self.neighborhood
-						.get_all_neighbors(p)
-						.map(|n| (n, get_cost(n) as usize))
-				},
-				|p| get_cost(p) >= 0,
+				|p| self.neighborhood.get_all_neighbors(p),
+				get_cost,
 				start,
 				end,
 				|p| self.neighborhood.heuristic(p, end),
@@ -99,10 +95,10 @@ impl<N: Neighborhood> AbstractPath<N> {
 	/// The return value is a [`Path`] from the [`generics`](crate::generics) module, which is
 	/// essentially a Vec<Point>, but with a `cost` member, since this path is consumed by
 	/// `resolve`
-	pub fn resolve(mut self, get_cost: impl Fn(Point) -> isize) -> Path<Point> {
+	pub fn resolve(mut self, mut get_cost: impl FnMut(Point) -> isize) -> Path<Point> {
 		let mut result = Vec::with_capacity(self.total_length);
 
-		while let Some(pos) = self.safe_next(&get_cost) {
+		while let Some(pos) = self.safe_next(&mut get_cost) {
 			result.push(pos);
 		}
 

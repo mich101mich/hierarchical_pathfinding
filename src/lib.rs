@@ -102,7 +102,7 @@
 //! const COST_MAP: [isize; 3] = [1, 10, -1];
 //!
 //! // only references the Grid when called
-//! fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 //!     move |(x, y)| COST_MAP[grid[y][x]]
 //! }
 //!
@@ -148,7 +148,7 @@
 //! #
 //! # const COST_MAP: [isize; 3] = [1, 10, -1];
 //! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 //! #     move |(x, y)| COST_MAP[grid[y][x]]
 //! # }
 //! #
@@ -193,7 +193,7 @@
 //! #
 //! # const COST_MAP: [isize; 3] = [1, 10, -1];
 //! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 //! #     move |(x, y)| COST_MAP[grid[y][x]]
 //! # }
 //! #
@@ -254,7 +254,7 @@
 //! #
 //! # const COST_MAP: [isize; 3] = [1, 10, -1];
 //! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 //! #     move |(x, y)| COST_MAP[grid[y][x]]
 //! # }
 //! #
@@ -312,7 +312,7 @@
 //! #
 //! # const COST_MAP: [isize; 3] = [1, 10, -1];
 //! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 //! #     move |(x, y)| COST_MAP[grid[y][x]]
 //! # }
 //! #
@@ -369,7 +369,7 @@
 //! #
 //! # const COST_MAP: [isize; 3] = [1, 10, -1];
 //! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 //! #     move |(x, y)| COST_MAP[grid[y][x]]
 //! # }
 //!

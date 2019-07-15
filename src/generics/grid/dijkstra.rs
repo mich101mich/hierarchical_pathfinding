@@ -1,4 +1,4 @@
-use super::{ordered_insert, Cost, Path};
+use super::super::{ordered_insert, Path};
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -14,68 +14,66 @@ use std::hash::Hash;
 /// ## Examples
 /// Basic usage:
 /// ```
-/// # use hierarchical_pathfinding::generics::dijkstra_search;
-/// // A     B--2--E
-/// // |\     
-/// // | \    
-/// // 1  9   
-/// // |   \  
-/// // |    \
-/// // C--6--D
-/// let (A, B, C, D, E) = (0, 1, 2, 3, 4);
-/// let cost_matrix: [[i32; 5]; 5] = [
-/// //    A,  B,  C,  D,  E
-/// 	[-1, -1,  1,  9, -1], // A
-/// 	[-1, -1, -1, -1,  2], // B
-/// 	[ 1, -1, -1,  6, -1], // C
-/// 	[ 9, -1,  6, -1, -1], // D
-/// 	[-1,  2, -1, -1, -1], // E
+/// # use hierarchical_pathfinding::generics::grid::dijkstra_search;
+/// # use hierarchical_pathfinding::{prelude::*, Point};
+/// // create and initialize Grid
+/// // 0 = empty, 1 = swamp, 2 = wall
+/// let mut grid = [
+///     [0, 2, 0, 0, 0],
+///     [0, 2, 2, 2, 2],
+///     [0, 1, 0, 0, 0],
+///     [0, 1, 0, 2, 0],
+///     [0, 0, 0, 2, 0],
 /// ];
+/// let (width, height) = (grid.len(), grid[0].len());
 ///
-/// let result = dijkstra_search(
-/// 	|point| { // get_all_neighbors
-/// 		cost_matrix[point]
-/// 			.iter()
-/// 			.enumerate()
-/// 			.filter(|&(_, cost)| *cost != -1)
-/// 			.map(|(id, cost)| (id, *cost as usize))
-/// 	},
-/// 	|_| true, // is_walkable
-/// 	A, // start
-/// 	&[D, E], // goals
+/// let neighborhood = ManhattanNeighborhood::new(width, height);
+///
+/// const COST_MAP: [isize; 3] = [1, 10, -1];
+///
+/// fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
+///     move |(x, y)| COST_MAP[grid[y][x]]
+/// }
+///
+/// let start = (0, 0);
+/// let goals = [(4, 4), (2, 0)];
+///
+/// let paths = dijkstra_search(
+///     |point| neighborhood.get_all_neighbors(point),
+///     cost_fn(&grid),
+///     start,
+///     &goals,
 /// );
 ///
-/// // if the Goal is reachable, the Path is added to the Map
-/// assert!(result.contains_key(&D));
-/// let path = &result[&D];
-/// assert_eq!(*path, vec![A, C, D]);
-/// assert_eq!(path.cost(), 7);
+/// // (4, 4) is reachable
+/// assert!(paths.contains_key(&goals[0]));
 ///
-/// // if the Goal is not reachable, there won't be an entry in the Map
-/// assert!(!result.contains_key(&E));
+/// // (2, 0) is not reachable
+/// assert!(!paths.contains_key(&goals[1]));
 /// ```
 ///
 /// ## Solid Goals
 /// It is possible to calculate the shortest Path to for example a Wall and other non-walkable
-/// Nodes using this function. To do that, simply supply a Function to the `is_walkable` Parameter
-/// that returns `false` for Nodes that should not be used as part of an actual Path. If there are
-/// no such Nodes in the Graph, `is_walkable` may simply be set to `|_| true`.  
+/// Nodes using this function. To do that, simply supply a Function to the `get_cost` Parameter
+/// that returns a negative number for Nodes that should not be used as part of an actual Path.
 /// In the case that a Path to a non-walkable Goal is requested, the neighbor of that Goal with the
 /// shortest Path from the Start is returned, if any is reachable. "neighbor" in this context is
 /// a Node for which `get_all_neighbors` contains the Goal.
 ///
 /// ## Arguments
 /// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node.
-/// 	The returned value is a Tuple of the `Id` of the neighbor and the Cost to get there.
+/// 	The returned value is the `Id` of the neighbor.
+/// - `get_cost` - a Function that takes a Node and returns the Cost required to walk across that Node.
+/// 	Negative values indicate Nodes that cannot be walked across.
 /// - `start` - the starting Node
 /// - `goals` - the Goals that this function is supposed to search for
 ///
 /// ## Returns
 /// a HashMap with all reachable Goal's Ids as the Key and the shortest Path to reach that Goal as Value.
 /// The first Node in the Path is always the `start` and the last is the corresponding Goal
-pub fn dijkstra_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = (Id, Cost)>>(
-	get_all_neighbors: impl Fn(Id) -> NeighborIter,
-	is_walkable: impl Fn(Id) -> bool,
+pub fn dijkstra_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = Id>>(
+	mut get_all_neighbors: impl FnMut(Id) -> NeighborIter,
+	mut get_cost: impl FnMut(Id) -> isize,
 	start: Id,
 	goals: &[Id],
 ) -> HashMap<Id, Path<Id>> {
@@ -104,10 +102,16 @@ pub fn dijkstra_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = (Id, 
 			}
 		}
 
-		for (other_id, delta_cost) in get_all_neighbors(current_id) {
+		let delta_cost = get_cost(current_id);
+		if delta_cost < 0 {
+			continue;
+		}
+		let delta_cost = delta_cost as usize;
+
+		for other_id in get_all_neighbors(current_id) {
 			let other_cost = cost + delta_cost;
 
-			if !is_walkable(other_id) {
+			if get_cost(other_id) < 0 {
 				let mut is_goal = false;
 				for &goal_id in remaining_goals.iter() {
 					if other_id == goal_id {

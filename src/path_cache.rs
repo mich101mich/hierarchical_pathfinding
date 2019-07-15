@@ -1,4 +1,8 @@
-use crate::{generics, neighbors::Neighborhood, NodeID, Point};
+use crate::{
+	generics::{self, graph, grid},
+	neighbors::Neighborhood,
+	NodeID, Point,
+};
 
 mod chunk;
 use self::chunk::Chunk;
@@ -75,7 +79,7 @@ impl<N: Neighborhood> PathCache<N> {
 	///
 	/// const COST_MAP: [isize; 3] = [1, 10, -1];
 	///
-	/// fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 	///     move |(x, y)| COST_MAP[grid[y][x]]
 	/// }
 	///
@@ -88,7 +92,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// ```
 	pub fn new(
 		(width, height): (usize, usize),
-		get_cost: impl Fn(Point) -> isize,
+		mut get_cost: impl FnMut(Point) -> isize,
 		neighborhood: N,
 		config: PathCacheConfig,
 	) -> PathCache<N> {
@@ -130,7 +134,7 @@ impl<N: Neighborhood> PathCache<N> {
 					(x * config.chunk_size, y * config.chunk_size),
 					(w, h),
 					(width, height),
-					&get_cost,
+					&mut get_cost,
 					&neighborhood,
 					&mut nodes,
 					config,
@@ -150,7 +154,7 @@ impl<N: Neighborhood> PathCache<N> {
 		};
 
 		// connect neighboring Nodes across Chunk borders
-		cache.connect_nodes(&get_cost);
+		cache.connect_nodes(&mut get_cost);
 
 		cache
 	}
@@ -187,7 +191,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #
 	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
 	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 	/// #     move |(x, y)| COST_MAP[grid[y][x]]
 	/// # }
 	/// #
@@ -239,7 +243,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #
 	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
 	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 	/// #     move |(x, y)| COST_MAP[grid[y][x]]
 	/// # }
 	/// #
@@ -297,7 +301,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #
 	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
 	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 	/// #     move |(x, y)| COST_MAP[grid[y][x]]
 	/// # }
 	/// #
@@ -339,22 +343,22 @@ impl<N: Neighborhood> PathCache<N> {
 		&mut self,
 		start: Point,
 		goal: Point,
-		get_cost: impl Fn(Point) -> isize,
+		mut get_cost: impl FnMut(Point) -> isize,
 	) -> Option<AbstractPath<N>> {
 		let mut inserted_start = false;
 		let mut inserted_goal = false;
 
 		let start_id = self.get_node_id(start).unwrap_or_else(|| {
 			inserted_start = true;
-			self.add_node(start, &get_cost)
+			self.add_node(start, &mut get_cost)
 		});
 
 		let goal_id = self.get_node_id(goal).unwrap_or_else(|| {
 			inserted_goal = true;
-			self.add_node(goal, &get_cost)
+			self.add_node(goal, &mut get_cost)
 		});
 
-		let path = generics::a_star_search(
+		let path = graph::a_star_search(
 			|id| {
 				self.nodes[&id]
 					.edges
@@ -375,14 +379,9 @@ impl<N: Neighborhood> PathCache<N> {
 				.sum();
 
 			if self.config.a_star_fallback && length < 2 * self.config.chunk_size {
-				let path = generics::a_star_search(
-					|p| {
-						let cost = get_cost(p) as usize;
-						self.neighborhood
-							.get_all_neighbors(p)
-							.map(move |n| (n, cost))
-					},
-					|p| get_cost(p) >= 0,
+				let path = grid::a_star_search(
+					|p| self.neighborhood.get_all_neighbors(p),
+					get_cost,
 					start,
 					goal,
 					|p| self.neighborhood.heuristic(p, goal),
@@ -452,7 +451,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #
 	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
 	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 	/// #     move |(x, y)| COST_MAP[grid[y][x]]
 	/// # }
 	/// #
@@ -497,7 +496,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #
 	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
 	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 	/// #     move |(x, y)| COST_MAP[grid[y][x]]
 	/// # }
 	/// #
@@ -530,21 +529,21 @@ impl<N: Neighborhood> PathCache<N> {
 		&mut self,
 		start: Point,
 		goals: &[Point],
-		get_cost: impl Fn(Point) -> isize,
+		mut get_cost: impl FnMut(Point) -> isize,
 	) -> HashMap<Point, AbstractPath<N>> {
 		let start_id = self
 			.get_node_id(start)
-			.unwrap_or_else(|| self.add_node(start, &get_cost));
+			.unwrap_or_else(|| self.add_node(start, &mut get_cost));
 
 		let goal_ids = goals
 			.iter()
 			.map(|&goal| {
 				self.get_node_id(goal)
-					.unwrap_or_else(|| self.add_node(goal, &get_cost))
+					.unwrap_or_else(|| self.add_node(goal, &mut get_cost))
 			})
 			.to_vec();
 
-		let paths = generics::dijkstra_search(
+		let paths = graph::dijkstra_search(
 			|id| {
 				self.nodes[&id]
 					.edges
@@ -600,7 +599,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #
 	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
 	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 	/// #     move |(x, y)| COST_MAP[grid[y][x]]
 	/// # }
 	/// #
@@ -635,7 +634,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// let path = pathfinding.find_path(start, goal, cost_fn(&grid));
 	/// assert!(path.is_some());
 	/// ```
-	pub fn tiles_changed(&mut self, tiles: &[Point], get_cost: impl Fn(Point) -> isize) {
+	pub fn tiles_changed(&mut self, tiles: &[Point], mut get_cost: impl FnMut(Point) -> isize) {
 		let size = self.config.chunk_size;
 
 		let mut dirty = HashMap::new();
@@ -724,7 +723,7 @@ impl<N: Neighborhood> PathCache<N> {
 					chunk.calculate_side_nodes(
 						dir,
 						(self.width, self.height),
-						&get_cost,
+						&mut get_cost,
 						self.config,
 						&mut candidates,
 					);
@@ -747,7 +746,7 @@ impl<N: Neighborhood> PathCache<N> {
 			if !dirty.contains_key(&cp) {
 				chunk.add_nodes(
 					nodes,
-					&get_cost,
+					&mut get_cost,
 					&self.neighborhood,
 					&mut self.nodes,
 					self.config,
@@ -767,7 +766,7 @@ impl<N: Neighborhood> PathCache<N> {
 
 			chunk.add_nodes(
 				nodes,
-				&get_cost,
+				&mut get_cost,
 				&self.neighborhood,
 				&mut self.nodes,
 				self.config,
@@ -775,7 +774,7 @@ impl<N: Neighborhood> PathCache<N> {
 		}
 
 		// re-establish cross-chunk connections
-		self.connect_nodes(&get_cost);
+		self.connect_nodes(&mut get_cost);
 	}
 
 	/// Allows for debugging and visualizing the PathCache
@@ -802,7 +801,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #
 	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
 	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + Fn(Point) -> isize {
+	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
 	/// #     move |(x, y)| COST_MAP[grid[y][x]]
 	/// # }
 	/// #
@@ -866,7 +865,7 @@ impl<N: Neighborhood> PathCache<N> {
 		self.config
 	}
 
-	fn add_node(&mut self, pos: Point, get_cost: &Fn(Point) -> isize) -> NodeID {
+	fn add_node(&mut self, pos: Point, mut get_cost: impl FnMut(Point) -> isize) -> NodeID {
 		let cost = get_cost(pos);
 		let id = self.nodes.add_node(pos, cost);
 
@@ -880,7 +879,9 @@ impl<N: Neighborhood> PathCache<N> {
 					continue;
 				}
 				let other_pos = other_node.pos;
-				if let Some(path) = chunk.find_path(other_pos, pos, &get_cost, &self.neighborhood) {
+				if let Some(path) =
+					chunk.find_path(other_pos, pos, &mut get_cost, &self.neighborhood)
+				{
 					self.nodes.add_edge(
 						other_id,
 						id,
@@ -895,7 +896,7 @@ impl<N: Neighborhood> PathCache<N> {
 			let chunk = get_chunk_mut!(self, pos);
 			chunk.add_nodes(
 				vec![id],
-				&get_cost,
+				&mut get_cost,
 				&self.neighborhood,
 				&mut self.nodes,
 				self.config,
@@ -933,7 +934,7 @@ impl<N: Neighborhood> PathCache<N> {
 		id
 	}
 
-	fn connect_nodes(&mut self, get_cost: &Fn(Point) -> isize) {
+	fn connect_nodes(&mut self, mut get_cost: impl FnMut(Point) -> isize) {
 		let ids = self.nodes.keys().cloned().to_vec();
 		for id in ids {
 			let pos = self.nodes[&id].pos;

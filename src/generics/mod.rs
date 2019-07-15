@@ -7,19 +7,31 @@
 mod path;
 pub use self::path::Path;
 
-mod dijkstra;
-pub use self::dijkstra::dijkstra_search;
+/// Implementation of A* and Dijkstra for Grids
+pub mod grid {
+	mod a_star;
+	pub use a_star::a_star_search;
 
-mod a_star;
-pub use self::a_star::a_star_search;
+	mod dijkstra;
+	pub use dijkstra::dijkstra_search;
+}
+
+/// Implementation of A* and Dijkstra for Graphs
+pub mod graph {
+	mod a_star;
+	pub use a_star::a_star_search;
+
+	mod dijkstra;
+	pub use dijkstra::dijkstra_search;
+}
 
 /// a Type to represent the Cost of traversing a Node
 pub type Cost = usize;
 
-fn ordered_insert<T, V, F>(vector: &mut Vec<T>, element: T, get_value: F)
+fn ordered_insert<T, V, F>(vector: &mut Vec<T>, element: T, mut get_value: F)
 where
 	V: Ord,
-	F: Fn(&T) -> V,
+	F: FnMut(&T) -> V,
 {
 	let value = get_value(&element);
 	for i in 0..vector.len() {
