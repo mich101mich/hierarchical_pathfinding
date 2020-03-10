@@ -330,7 +330,7 @@
 //!
 //! grid[0][1] = 0;
 //! grid[4][4] = 2;
-//! 
+//!
 //! assert_eq!(grid, [
 //!     [0, 0, 0, 0, 0],
 //!     [0, 2, 2, 2, 2],
@@ -399,8 +399,10 @@ pub mod neighbors;
 
 pub mod generics;
 
+pub mod node_id;
+
 /// The prelude for this crate.
-/// 
+///
 /// Note: Even though most examples use the internal type-definition [`Point`]
 /// (aka `(usize, usize)`), it is not included in the prelude since most users probably have
 /// another implementation with the same name in scope.

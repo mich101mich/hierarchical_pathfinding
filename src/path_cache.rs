@@ -360,22 +360,22 @@ impl<N: Neighborhood> PathCache<N> {
 
 		let path = graph::a_star_search(
 			|id| {
-				self.nodes[&id]
+				self.nodes[id]
 					.edges
 					.iter()
 					.map(|(id, path)| (*id, path.cost()))
 			},
-			|id| self.nodes[&id].walk_cost >= 0,
+			|id| self.nodes[id].walk_cost >= 0,
 			start_id,
 			goal_id,
-			|id| self.neighborhood.heuristic(self.nodes[&id].pos, goal),
+			|id| self.neighborhood.heuristic(self.nodes[id].pos, goal),
 		);
 
 		let final_path = if let Some(path) = path {
 			let length: usize = path
 				.iter()
 				.zip(path.iter().skip(1))
-				.map(|(a, b)| self.nodes[&a].edges[&b].len())
+				.map(|(a, b)| self.nodes[*a].edges[&b].len())
 				.sum();
 
 			if self.config.a_star_fallback && length < 2 * self.config.chunk_size {
@@ -395,7 +395,7 @@ impl<N: Neighborhood> PathCache<N> {
 			} else {
 				let mut ret = AbstractPath::<N>::new(self.neighborhood.clone(), start);
 				for (a, b) in path.iter().zip(path.iter().skip(1)) {
-					let path = &self.nodes[&a].edges[&b];
+					let path = &self.nodes[*a].edges[&b];
 					ret.add_path_segment(path.clone());
 				}
 
@@ -545,12 +545,12 @@ impl<N: Neighborhood> PathCache<N> {
 
 		let paths = graph::dijkstra_search(
 			|id| {
-				self.nodes[&id]
+				self.nodes[id]
 					.edges
 					.iter()
 					.map(|(id, path)| (*id, path.cost()))
 			},
-			|id| self.nodes[&id].walk_cost >= 0,
+			|id| self.nodes[id].walk_cost >= 0,
 			start_id,
 			&goal_ids,
 		);
@@ -561,7 +561,7 @@ impl<N: Neighborhood> PathCache<N> {
 			if let Some(path) = paths.get(&id) {
 				let mut ret_path = AbstractPath::<N>::new(self.neighborhood.clone(), start);
 				for (a, b) in path.iter().zip(path.iter().skip(1)) {
-					let path = &self.nodes[&a].edges[&b];
+					let path = &self.nodes[*a].edges[&b];
 					ret_path.add_path_segment(path.clone());
 				}
 				ret.insert(goal, ret_path);
@@ -668,10 +668,10 @@ impl<N: Neighborhood> PathCache<N> {
 				.nodes
 				.iter()
 				.filter(|id| {
-					let pos = self.nodes[id].pos;
+					let pos = self.nodes[**id].pos;
 					!chunk.at_any_side(pos)
 				})
-				.cloned()
+				.copied()
 				.to_vec();
 
 			let chunk = get_chunk_mut!(self, cp);
@@ -689,10 +689,10 @@ impl<N: Neighborhood> PathCache<N> {
 					.nodes
 					.iter()
 					.filter(|id| {
-						let pos = self.nodes[id].pos;
+						let pos = self.nodes[**id].pos;
 						Dir::all().any(|dir| sides[dir.num()] && chunk.at_side(pos, dir))
 					})
-					.cloned()
+					.copied()
 					.to_vec()
 			};
 
@@ -708,8 +708,7 @@ impl<N: Neighborhood> PathCache<N> {
 		for cp in dirty.keys() {
 			let chunk = get_chunk!(self, cp);
 			for id in chunk.nodes.iter() {
-				let node = self.nodes.get_mut(id).unwrap_or_else(invalid_id!());
-				node.edges.clear();
+				self.nodes[*id].edges.clear();
 			}
 		}
 
@@ -761,7 +760,7 @@ impl<N: Neighborhood> PathCache<N> {
 		// recreate Paths
 		for cp in dirty.keys() {
 			let chunk = get_chunk_mut!(self, cp);
-			let nodes = chunk.nodes.iter().cloned().to_vec();
+			let nodes = chunk.nodes.iter().copied().to_vec();
 			chunk.nodes.clear();
 
 			chunk.add_nodes(
@@ -854,10 +853,7 @@ impl<N: Neighborhood> PathCache<N> {
 
 	#[allow(dead_code)]
 	fn get_node_id(&self, pos: Point) -> Option<NodeID> {
-		self.nodes
-			.iter()
-			.find(|(_, node)| node.pos == pos)
-			.map(|(id, _)| *id)
+		self.nodes.id_at(pos)
 	}
 
 	/// Returns the config used to create this PathCache
@@ -873,7 +869,7 @@ impl<N: Neighborhood> PathCache<N> {
 
 		if cost < 0 {
 			for &other_id in chunk.nodes.iter() {
-				let other_node = &self.nodes[&other_id];
+				let other_node = &self.nodes[other_id];
 
 				if other_node.walk_cost < 0 {
 					continue;
@@ -916,16 +912,15 @@ impl<N: Neighborhood> PathCache<N> {
 		for (other_id, other_pos) in neighbors {
 			if cost >= 0 {
 				let path = generics::Path::new(vec![pos, other_pos], get_cost(pos) as usize);
-				let node = self.nodes.get_mut(&id).unwrap_or_else(invalid_id!());
-				node.edges
+				self.nodes[id]
+					.edges
 					.insert(other_id, PathSegment::new(path, self.config.cache_paths));
 			}
 			if get_cost(other_pos) >= 0 {
 				let other_path =
 					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
 
-				let other_node = self.nodes.get_mut(&other_id).unwrap_or_else(invalid_id!());
-				other_node
+				self.nodes[other_id]
 					.edges
 					.insert(id, PathSegment::new(other_path, self.config.cache_paths));
 			}
@@ -935,9 +930,9 @@ impl<N: Neighborhood> PathCache<N> {
 	}
 
 	fn connect_nodes(&mut self, mut get_cost: impl FnMut(Point) -> isize) {
-		let ids = self.nodes.keys().cloned().to_vec();
+		let ids = self.nodes.keys().to_vec();
 		for id in ids {
-			let pos = self.nodes[&id].pos;
+			let pos = self.nodes[id].pos;
 			let possible = self.neighborhood.get_all_neighbors(pos).to_vec();
 			let neighbors = self
 				.nodes
@@ -952,12 +947,11 @@ impl<N: Neighborhood> PathCache<N> {
 				let other_path =
 					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
 
-				let node = self.nodes.get_mut(&id).unwrap_or_else(invalid_id!());
-				node.edges
+				self.nodes[id]
+					.edges
 					.insert(other_id, PathSegment::new(path, self.config.cache_paths));
 
-				let other_node = self.nodes.get_mut(&other_id).unwrap_or_else(invalid_id!());
-				other_node
+				self.nodes[other_id]
 					.edges
 					.insert(id, PathSegment::new(other_path, self.config.cache_paths));
 			}
@@ -993,7 +987,7 @@ impl<'a, N: Neighborhood> CacheInspector<'a, N> {
 	pub fn new(src: &'a PathCache<N>) -> Self {
 		CacheInspector {
 			src,
-			nodes: src.nodes.keys().cloned().to_vec(),
+			nodes: src.nodes.keys().to_vec(),
 			current_index: 0,
 		}
 	}
@@ -1028,7 +1022,7 @@ impl<'a, N: Neighborhood> NodeInspector<'a, N> {
 	pub fn new(src: &'a PathCache<N>, id: NodeID) -> Self {
 		NodeInspector {
 			src,
-			node: &src.nodes[&id],
+			node: &src.nodes[id],
 		}
 	}
 

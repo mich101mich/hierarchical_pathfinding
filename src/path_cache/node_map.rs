@@ -1,6 +1,5 @@
 use super::{path_segment::PathSegment, Node};
 use crate::{NodeID, Point};
-use std::collections::HashMap;
 
 macro_rules! invalid_id {
 	() => {
@@ -10,35 +9,42 @@ macro_rules! invalid_id {
 
 #[derive(Clone, Debug)]
 pub struct NodeMap {
-	nodes: HashMap<NodeID, Node>,
-	next_id: NodeID,
+	nodes: Vec<Option<Node>>,
+	next_id: usize,
 }
 
 impl NodeMap {
 	pub fn new() -> NodeMap {
 		NodeMap {
-			nodes: HashMap::new(),
+			nodes: Vec::new(),
 			next_id: 0,
 		}
 	}
 
 	pub fn add_node(&mut self, pos: Point, walk_cost: isize) -> NodeID {
+		while self.next_id < self.nodes.len() && self.nodes[self.next_id].is_some() {
+			self.next_id += 1;
+		}
 		let id = self.next_id;
 		self.next_id += 1;
 
-		let node = Node::new(id, pos, walk_cost);
-		self.nodes.insert(id, node);
-		id
+		let node = Node::new(id as NodeID, pos, walk_cost);
+		if id >= self.nodes.len() {
+			self.nodes.push(Some(node));
+		} else {
+			self.nodes[id] = Some(node);
+		}
+		id as NodeID
 	}
 
 	pub fn add_edge(&mut self, src: NodeID, target: NodeID, path: PathSegment) {
 		let (src_pos, src_cost) = {
-			let node = &self[&src];
+			let node = &self[src];
 			(node.pos, node.walk_cost)
 		};
 		assert!(src_cost >= 0, "Cannot add Path from solid Node");
 
-		let target_node = self.get_mut(&target).unwrap_or_else(invalid_id!());
+		let target_node = &mut self[target];
 
 		let target_pos = target_node.pos;
 		let target_cost = target_node.walk_cost;
@@ -58,30 +64,57 @@ impl NodeMap {
 			);
 		}
 
-		let src_node = self.get_mut(&src).unwrap_or_else(invalid_id!());
+		let src_node = &mut self[src];
 		src_node.edges.insert(target, path);
 	}
 
 	pub fn remove_node(&mut self, id: NodeID) {
-		let node = self.remove(&id).unwrap_or_else(invalid_id!());
+		let node = self.nodes[id as usize].take().unwrap_or_else(invalid_id!());
 		for (other_id, _) in node.edges {
-			self.get_mut(&other_id)
-				.unwrap_or_else(invalid_id!())
-				.edges
-				.remove(&id);
+			self[other_id].edges.remove(&id);
 		}
+	}
+
+	pub fn iter<'a>(&'a self) -> impl Iterator<Item = (NodeID, &'a Node)> + 'a {
+		self.nodes
+			.iter()
+			.enumerate()
+			.filter_map(|(id, opt)| opt.as_ref().map(|node| (id as NodeID, node)))
+	}
+	pub fn keys<'a>(&'a self) -> impl Iterator<Item = NodeID> + 'a {
+		self.nodes
+			.iter()
+			.enumerate()
+			.filter(|(_, opt)| opt.is_some())
+			.map(|(id, _)| id as NodeID)
+	}
+	pub fn values<'a>(&'a self) -> impl Iterator<Item = &'a Node> + 'a {
+		self.nodes.iter().filter_map(|opt| opt.as_ref())
+	}
+
+	pub fn find_id<F: FnMut(&Node) -> bool>(&self, mut f: F) -> Option<NodeID> {
+		self.iter().find(|(_, node)| f(node)).map(|(id, _)| id)
+	}
+	pub fn id_at(&self, pos: Point) -> Option<NodeID> {
+		self.find_id(|n| n.pos == pos)
 	}
 }
 
-use std::ops::{Deref, DerefMut};
-impl Deref for NodeMap {
-	type Target = HashMap<NodeID, Node>;
-	fn deref(&self) -> &HashMap<NodeID, Node> {
-		&self.nodes
+use std::ops::{Index, IndexMut};
+impl Index<NodeID> for NodeMap {
+	type Output = Node;
+	// TODO: add #[track_caller] once that is possible
+	fn index(&self, index: NodeID) -> &Node {
+		self.nodes[index as usize]
+			.as_ref()
+			.unwrap_or_else(invalid_id!())
 	}
 }
-impl DerefMut for NodeMap {
-	fn deref_mut(&mut self) -> &mut HashMap<NodeID, Node> {
-		&mut self.nodes
+impl IndexMut<NodeID> for NodeMap {
+	// TODO: add #[track_caller] once that is possible
+	fn index_mut(&mut self, index: NodeID) -> &mut Node {
+		self.nodes[index as usize]
+			.as_mut()
+			.unwrap_or_else(invalid_id!())
 	}
 }

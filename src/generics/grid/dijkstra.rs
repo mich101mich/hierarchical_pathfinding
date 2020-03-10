@@ -77,7 +77,7 @@ pub fn dijkstra_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = Id>>(
 	start: Id,
 	goals: &[Id],
 ) -> HashMap<Id, Path<Id>> {
-	let mut visited = ::std::collections::HashMap::new();
+	let mut visited = HashMap::new();
 	let mut next = vec![(start, 0)];
 	visited.insert(start, (0, start));
 

@@ -1,105 +1,12 @@
 use super::super::{ordered_insert, Cost, Path};
-use std::collections::HashMap;
-use std::hash::Hash;
+use crate::{node_id::*, NodeID};
 
-/// Searches a Graph using the [A* Algorithm](https://en.wikipedia.org/wiki/A*_search_algorithm).
-///
-/// The Generic type Parameter `Id` is supposed to uniquely identify a Node in the Graph.
-/// This may be a Number, String, a Grid position, ... as long as it can be compared, hashed and copied.
-/// Note that it is advised to choose a short representation for the Id, since it will be copied several times.
-///
-/// ## Examples
-/// Basic usage:
-/// ```
-/// # use hierarchical_pathfinding::generics::graph::a_star_search;
-/// // A     B--2--E
-/// // |\     
-/// // | \    
-/// // 1  9   
-/// // |   \  
-/// // |    \
-/// // C--6--D
-/// let (A, B, C, D, E) = (0, 1, 2, 3, 4);
-/// let cost_matrix: [[i32; 5]; 5] = [
-/// //    A,  B,  C,  D,  E
-///     [-1, -1,  1,  9, -1], // A
-///     [-1, -1, -1, -1,  2], // B
-///     [ 1, -1, -1,  6, -1], // C
-///     [ 9, -1,  6, -1, -1], // D
-///     [-1,  2, -1, -1, -1], // E
-/// ];
-/// # fn euclid_distance(a: usize, b: usize) -> usize {
-/// #     [[0, 1, 1, 2, 2], [1, 0, 2, 1, 1], [1, 2, 0, 1, 3], [2, 1, 1, 0, 2], [2, 1, 3, 2, 0]][a][b]
-/// # }
-///
-/// let result = a_star_search(
-///     |point| { // get_all_neighbors
-///         cost_matrix[point]
-///             .iter()
-///             .enumerate()
-///             .filter(|&(_, cost)| *cost != -1)
-///             .map(|(id, cost)| (id, *cost as usize))
-///     },
-///     |_| true, // is_walkable
-///     A, // start
-///     D, // goal
-///     |point| euclid_distance(point, D), // heuristic
-/// );
-///
-/// assert!(result.is_some());
-/// let path = result.unwrap();
-///
-/// assert_eq!(path, vec![A, C, D]);
-/// assert_eq!(path.cost(), 7);
-/// ```
-///
-/// If the Goal cannot be reached, None is returned:
-/// ```
-/// # use hierarchical_pathfinding::generics::graph::a_star_search;
-/// # let (A, B, C, D, E) = (0, 1, 2, 3, 4);
-/// # let cost_matrix: [[i32; 5]; 5] = [
-/// # //    A,  B,  C,  D,  E
-/// #     [-1, -1,  1,  9, -1], // A
-/// #     [-1, -1, -1, -1,  2], // B
-/// #     [ 1, -1, -1,  6, -1], // C
-/// #     [ 9, -1,  6, -1, -1], // D
-/// #     [-1,  2, -1, -1, -1], // E
-/// # ];
-/// # fn euclid_distance(a: usize, b: usize) -> usize {
-/// #     [[0, 1, 1, 2, 2], [1, 0, 2, 1, 1], [1, 2, 0, 1, 3], [2, 1, 1, 0, 2], [2, 1, 3, 2, 0]][a][b]
-/// # }
-/// #
-/// # let result = a_star_search(
-/// #    |point| { // get_all_neighbors
-/// #        cost_matrix[point]
-/// #            .iter()
-/// #            .enumerate()
-/// #            .filter(|&(_, cost)| *cost != -1)
-/// #            .map(|(id, cost)| (id, *cost as usize))
-/// #    },
-/// #    |_| true, // is_walkable
-/// // ...
-///     A, // start
-///     E, // goal
-///     |point| euclid_distance(point, E), // heuristic
-/// );
-///
-/// assert_eq!(result, None);
-/// ```
-///
-/// ## Solid Goals
-/// It is possible to calculate the shortest Path to for example a Wall and other non-walkable
-/// Nodes using this function. To do that, simply supply a Function to the `is_walkable` Parameter
-/// that returns `false` for Nodes that should not be used as part of an actual Path. If there are
-/// no such Nodes in the Graph, `is_walkable` may simply be set to `|_| true`.  
-/// In the case that a Path to a non-walkable Goal is requested, the neighbor of that Goal with the
-/// shortest Path from the Start is returned, if any is reachable. "neighbor" in this context is
-/// a Node for which `get_all_neighbors` contains the Goal.
+/// Searches a Graph using the [A* Algorithm](https://en.wikipedia.org/wiki/A*_search_algorithm) in a Node Graph with [`NodeID`]s.
 ///
 /// ## Arguments
 /// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node.
-///     The returned value is a Tuple of the `Id` of the neighbor and the Cost to get there.
-/// - `is_walkable` - a Function that determines if a Node can be walked over. see [Solid Goals](#solid-goals) for more info
+///     The returned value is a Tuple of the `NodeID` of the neighbor and the Cost to get there.
+/// - `is_walkable` - a Function that determines if a Node can be walked over. see [Solid Goals](../grid/fn.a_star_search.html#solid-goals) for more info
 /// - `start` - the starting Node
 /// - `goal` - the Goal that this function is supposed to search for
 /// - `heuristic` - the Heuristic Function of the A* Algorithm
@@ -107,17 +14,17 @@ use std::hash::Hash;
 /// ## Returns
 /// the Path, if one was found, or None if the `goal` is unreachable.
 /// The first Node in the Path is always the `start` and the last is the `goal`
-pub fn a_star_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = (Id, Cost)>>(
-	mut get_all_neighbors: impl FnMut(Id) -> NeighborIter,
-	mut is_walkable: impl FnMut(Id) -> bool,
-	start: Id,
-	goal: Id,
-	mut heuristic: impl FnMut(Id) -> Cost,
-) -> Option<Path<Id>> {
+pub fn a_star_search<NeighborIter: Iterator<Item = (NodeID, Cost)>>(
+	mut get_all_neighbors: impl FnMut(NodeID) -> NeighborIter,
+	mut is_walkable: impl FnMut(NodeID) -> bool,
+	start: NodeID,
+	goal: NodeID,
+	mut heuristic: impl FnMut(NodeID) -> Cost,
+) -> Option<Path<NodeID>> {
 	if start == goal {
 		return Some(Path::new(vec![start, start], 0));
 	}
-	let mut visited = HashMap::new();
+	let mut visited = node_id_map();
 	let mut next = vec![(start, 0)];
 	visited.insert(start, (0, start));
 

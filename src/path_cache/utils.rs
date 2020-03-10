@@ -21,8 +21,8 @@ pub enum Dir {
 pub use self::Dir::*;
 
 impl Dir {
-	pub fn all() -> impl Iterator<Item = Dir> {
-		[UP, RIGHT, DOWN, LEFT].iter().cloned()
+	pub fn all() -> std::iter::Copied<std::slice::Iter<'static, Dir>> {
+		[UP, RIGHT, DOWN, LEFT].iter().copied()
 	}
 	pub fn opposite(self) -> Dir {
 		((self.num() + 2) % 4).into()

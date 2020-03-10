@@ -1,12 +1,12 @@
 use super::{path_segment::PathSegment, utils::*, NodeMap};
-use crate::{neighbors::Neighborhood, NodeID, PathCacheConfig, Point};
+use crate::{neighbors::Neighborhood, node_id::*, NodeID, PathCacheConfig, Point};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug)]
 pub struct Chunk {
 	pub pos: Point,
 	pub size: Point,
-	pub nodes: HashSet<NodeID>,
+	pub nodes: NodeIDSet,
 	pub sides: [bool; 4],
 }
 
@@ -23,7 +23,7 @@ impl Chunk {
 		let mut chunk = Chunk {
 			pos,
 			size,
-			nodes: HashSet::new(),
+			nodes: node_id_set(),
 			sides: [false; 4],
 		};
 
@@ -180,7 +180,7 @@ impl Chunk {
 			.nodes
 			.iter()
 			.chain(to_visit.iter()) // results in to_visit points at the end => enables pop()
-			.map(|id| all_nodes[id].pos)
+			.map(|id| all_nodes[*id].pos)
 			.to_vec();
 
 		for &id in to_visit.iter() {
@@ -196,10 +196,8 @@ impl Chunk {
 			let paths = self.find_paths(point, &points, &mut get_cost, neighborhood);
 
 			for (other_pos, path) in paths {
-				let other_id = *all_nodes
-					.iter()
-					.find(|(_, node)| node.pos == other_pos)
-					.map(|(id, _)| id)
+				let other_id = all_nodes
+					.id_at(other_pos)
 					.expect("Internal Error #5 in Chunk. Please report this");
 
 				all_nodes.add_edge(id, other_id, PathSegment::new(path, config.cache_paths));
