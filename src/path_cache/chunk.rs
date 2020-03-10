@@ -1,6 +1,7 @@
 use super::{path_segment::PathSegment, utils::*, NodeMap};
-use crate::{neighbors::Neighborhood, node_id::*, NodeID, PathCacheConfig, Point};
-use std::collections::{HashMap, HashSet};
+use crate::{
+	neighbors::Neighborhood, node_id::*, NodeID, PathCacheConfig, Point, PointMap, PointSet,
+};
 
 #[derive(Clone, Debug)]
 pub struct Chunk {
@@ -23,11 +24,11 @@ impl Chunk {
 		let mut chunk = Chunk {
 			pos,
 			size,
-			nodes: node_id_set(),
+			nodes: NodeIDSet::default(),
 			sides: [false; 4],
 		};
 
-		let mut candidates = HashSet::new();
+		let mut candidates = PointSet::default();
 
 		for dir in Dir::all() {
 			if dir == UP && chunk.top() == 0
@@ -58,7 +59,7 @@ impl Chunk {
 		total_size: (usize, usize),
 		mut get_cost: impl FnMut(Point) -> isize,
 		config: PathCacheConfig,
-		candidates: &mut HashSet<Point>,
+		candidates: &mut PointSet,
 	) {
 		let mut current = [
 			(self.pos.0, self.pos.1),
@@ -212,7 +213,7 @@ impl Chunk {
 		goals: &[Point],
 		get_cost: impl FnMut(Point) -> isize,
 		neighborhood: &N,
-	) -> HashMap<Point, crate::generics::Path<Point>> {
+	) -> PointMap<crate::generics::Path<Point>> {
 		crate::generics::grid::dijkstra_search(
 			|p| {
 				neighborhood

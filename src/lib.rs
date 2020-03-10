@@ -392,6 +392,9 @@ pub type NodeID = u32;
 /// A shorthand for Points on the grid
 pub type Point = (usize, usize);
 
+type PointMap<V> = fnv::FnvHashMap<Point, V>;
+type PointSet = fnv::FnvHashSet<Point>;
+
 mod path_cache;
 pub use self::path_cache::{AbstractPath, PathCache, PathCacheConfig};
 

@@ -15,7 +15,7 @@ impl Node {
 			id,
 			pos,
 			walk_cost,
-			edges: node_id_map(),
+			edges: NodeIDMap::default(),
 		}
 	}
 }

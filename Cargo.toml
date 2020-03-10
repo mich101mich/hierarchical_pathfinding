@@ -16,3 +16,4 @@ travis-ci = { repository = "mich101mich/hierarchical_pathfinding" }
 circle-ci = { repository = "mich101mich/hierarchical_pathfinding" }
 
 [dependencies]
+fnv = "1.0.6"

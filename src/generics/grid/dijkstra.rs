@@ -1,12 +1,11 @@
 use super::super::{ordered_insert, Path};
-use std::collections::HashMap;
-use std::hash::Hash;
+use crate::{Point, PointMap};
 
 /// Searches a Graph using [Dijkstra's Algorithm](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm).
 ///
-/// The Generic type Parameter `Id` is supposed to uniquely identify a Node in the Graph.
+/// The Generic type Parameter `Point` is supposed to uniquely identify a Node in the Graph.
 /// This may be a Number, String, a Grid position, ... as long as it can be compared, hashed and copied.
-/// Note that it is advised to choose a short representation for the Id, since it will be copied several times.
+/// Note that it is advised to choose a short representation for the Point, since it will be copied several times.
 ///
 /// This function can be used to search for several Goals and will try to calculate a Path for every provided Goal.
 /// It stops as soon as it has the shortest Path to every Goal, or when all reachable Nodes have been expanded.
@@ -62,28 +61,28 @@ use std::hash::Hash;
 ///
 /// ## Arguments
 /// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node.
-///     The returned value is the `Id` of the neighbor.
+///     The returned value is the `Point` of the neighbor.
 /// - `get_cost` - a Function that takes a Node and returns the Cost required to walk across that Node.
 ///     Negative values indicate Nodes that cannot be walked across.
 /// - `start` - the starting Node
 /// - `goals` - the Goals that this function is supposed to search for
 ///
 /// ## Returns
-/// a HashMap with all reachable Goal's Ids as the Key and the shortest Path to reach that Goal as Value.
+/// a HashMap with all reachable Goal's Points as the Key and the shortest Path to reach that Goal as Value.
 /// The first Node in the Path is always the `start` and the last is the corresponding Goal
-pub fn dijkstra_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = Id>>(
-	mut get_all_neighbors: impl FnMut(Id) -> NeighborIter,
-	mut get_cost: impl FnMut(Id) -> isize,
-	start: Id,
-	goals: &[Id],
-) -> HashMap<Id, Path<Id>> {
-	let mut visited = HashMap::new();
+pub fn dijkstra_search<NeighborIter: Iterator<Item = Point>>(
+	mut get_all_neighbors: impl FnMut(Point) -> NeighborIter,
+	mut get_cost: impl FnMut(Point) -> isize,
+	start: Point,
+	goals: &[Point],
+) -> PointMap<Path<Point>> {
+	let mut visited = PointMap::default();
 	let mut next = vec![(start, 0)];
 	visited.insert(start, (0, start));
 
 	let mut remaining_goals = goals.to_vec();
 
-	let mut goal_costs = HashMap::with_capacity(goals.len());
+	let mut goal_costs = PointMap::with_capacity_and_hasher(goals.len(), Default::default());
 
 	while let Some((current_id, _)) = next.pop() {
 		let cost = visited[&current_id].0;
@@ -136,7 +135,7 @@ pub fn dijkstra_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = Id>>(
 		}
 	}
 
-	let mut goal_data = HashMap::with_capacity(goal_costs.len());
+	let mut goal_data = PointMap::with_capacity_and_hasher(goal_costs.len(), Default::default());
 
 	for (&goal, &cost) in goal_costs.iter() {
 		let steps = {

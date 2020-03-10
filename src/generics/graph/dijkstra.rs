@@ -21,13 +21,13 @@ pub fn dijkstra_search<NeighborIter: Iterator<Item = (NodeID, Cost)>>(
 	start: NodeID,
 	goals: &[NodeID],
 ) -> NodeIDMap<Path<NodeID>> {
-	let mut visited = node_id_map();
+	let mut visited = NodeIDMap::default();
 	let mut next = vec![(start, 0)];
 	visited.insert(start, (0, start));
 
 	let mut remaining_goals = goals.to_vec();
 
-	let mut goal_costs = node_id_map_with_cap(goals.len());
+	let mut goal_costs = NodeIDMap::with_capacity_and_hasher(goals.len(), Default::default());
 
 	while let Some((current_id, _)) = next.pop() {
 		let cost = visited[&current_id].0;
@@ -74,7 +74,7 @@ pub fn dijkstra_search<NeighborIter: Iterator<Item = (NodeID, Cost)>>(
 		}
 	}
 
-	let mut goal_data = node_id_map_with_cap(goal_costs.len());
+	let mut goal_data = NodeIDMap::with_capacity_and_hasher(goal_costs.len(), Default::default());
 
 	for (&goal, &cost) in goal_costs.iter() {
 		let steps = {

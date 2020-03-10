@@ -24,7 +24,7 @@ pub fn a_star_search<NeighborIter: Iterator<Item = (NodeID, Cost)>>(
 	if start == goal {
 		return Some(Path::new(vec![start, start], 0));
 	}
-	let mut visited = node_id_map();
+	let mut visited = NodeIDMap::default();
 	let mut next = vec![(start, 0)];
 	visited.insert(start, (0, start));
 

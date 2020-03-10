@@ -1,7 +1,7 @@
 use crate::{
 	generics::{self, graph, grid},
 	neighbors::Neighborhood,
-	NodeID, Point,
+	NodeID, Point, PointMap, PointSet,
 };
 
 mod chunk;
@@ -25,9 +25,6 @@ use self::path_segment::PathSegment;
 
 mod utils;
 use self::utils::*;
-
-#[allow(unused_imports)]
-use std::collections::{HashMap, HashSet};
 
 /// A struct to store the Hierarchical Pathfinding information.
 #[derive(Clone, Debug)]
@@ -530,7 +527,7 @@ impl<N: Neighborhood> PathCache<N> {
 		start: Point,
 		goals: &[Point],
 		mut get_cost: impl FnMut(Point) -> isize,
-	) -> HashMap<Point, AbstractPath<N>> {
+	) -> PointMap<AbstractPath<N>> {
 		let start_id = self
 			.get_node_id(start)
 			.unwrap_or_else(|| self.add_node(start, &mut get_cost));
@@ -555,7 +552,7 @@ impl<N: Neighborhood> PathCache<N> {
 			&goal_ids,
 		);
 
-		let mut ret = HashMap::new();
+		let mut ret = PointMap::default();
 
 		for (&goal, id) in goals.iter().zip(goal_ids) {
 			if let Some(path) = paths.get(&id) {
@@ -637,14 +634,14 @@ impl<N: Neighborhood> PathCache<N> {
 	pub fn tiles_changed(&mut self, tiles: &[Point], mut get_cost: impl FnMut(Point) -> isize) {
 		let size = self.config.chunk_size;
 
-		let mut dirty = HashMap::new();
+		let mut dirty = PointMap::default();
 		for &p in tiles {
 			let chunk_pos = self.get_chunk_pos(p);
 			dirty.entry(chunk_pos).or_insert_with(Vec::new).push(p);
 		}
 
 		// map of chunk_pos => array: [bool; 4] where array[side] == true if chunk[side] needs to be renewed
-		let mut renew = HashMap::new();
+		let mut renew = PointMap::default();
 
 		for (&cp, positions) in dirty.iter() {
 			let chunk = get_chunk!(self, cp);
@@ -714,7 +711,7 @@ impl<N: Neighborhood> PathCache<N> {
 
 		// recreate sides in renew
 		for (&cp, sides) in renew.iter() {
-			let mut candidates = HashSet::new();
+			let mut candidates = PointSet::default();
 			let chunk = get_chunk_mut!(self, cp);
 
 			for dir in Dir::all() {

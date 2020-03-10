@@ -1,12 +1,11 @@
 use super::super::{ordered_insert, Cost, Path};
-use std::collections::HashMap;
-use std::hash::Hash;
+use crate::{Point, PointMap};
 
 /// Searches a Graph using the [A* Algorithm](https://en.wikipedia.org/wiki/A*_search_algorithm).
 ///
-/// The Generic type Parameter `Id` is supposed to uniquely identify a Node in the Graph.
+/// The Generic type Parameter `Point` is supposed to uniquely identify a Node in the Graph.
 /// This may be a Number, String, a Grid position, ... as long as it can be compared, hashed and copied.
-/// Note that it is advised to choose a short representation for the Id, since it will be copied several times.
+/// Note that it is advised to choose a short representation for the Point, since it will be copied several times.
 ///
 /// ## Examples
 /// Basic usage:
@@ -97,7 +96,7 @@ use std::hash::Hash;
 ///
 /// ## Arguments
 /// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node.
-///     The returned value is the `Id` of the neighbor.
+///     The returned value is the `Point` of the neighbor.
 /// - `get_cost` - a Function that takes a Node and returns the Cost required to walk across that Node.
 ///     Negative values indicate Nodes that cannot be walked across.
 /// - `start` - the starting Node
@@ -107,17 +106,17 @@ use std::hash::Hash;
 /// ## Returns
 /// the Path, if one was found, or None if the `goal` is unreachable.
 /// The first Node in the Path is always the `start` and the last is the `goal`
-pub fn a_star_search<Id: Copy + Eq + Hash, NeighborIter: Iterator<Item = Id>>(
-	mut get_all_neighbors: impl FnMut(Id) -> NeighborIter,
-	mut get_cost: impl FnMut(Id) -> isize,
-	start: Id,
-	goal: Id,
-	mut heuristic: impl FnMut(Id) -> Cost,
-) -> Option<Path<Id>> {
+pub fn a_star_search<NeighborIter: Iterator<Item = Point>>(
+	mut get_all_neighbors: impl FnMut(Point) -> NeighborIter,
+	mut get_cost: impl FnMut(Point) -> isize,
+	start: Point,
+	goal: Point,
+	mut heuristic: impl FnMut(Point) -> Cost,
+) -> Option<Path<Point>> {
 	if start == goal {
 		return Some(Path::new(vec![start, start], 0));
 	}
-	let mut visited = HashMap::new();
+	let mut visited = PointMap::default();
 	let mut next = vec![(start, 0)];
 	visited.insert(start, (0, start));
 
