@@ -4,14 +4,14 @@
 /// ```
 /// # use hierarchical_pathfinding::PathCacheConfig;
 /// assert_eq!(
-/// 	PathCacheConfig {
-/// 		chunk_size: 8,
-/// 		cache_paths: true,
-/// 		keep_insertions: true,
-/// 		a_star_fallback: true,
-/// 		perfect_paths: false,
-/// 	},
-/// 	Default::default()
+///     PathCacheConfig {
+///         chunk_size: 8,
+///         cache_paths: true,
+///         keep_insertions: true,
+///         a_star_fallback: true,
+///         perfect_paths: false,
+///     },
+///     Default::default()
 /// );
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -57,14 +57,14 @@ impl PathCacheConfig {
 	/// ```
 	/// # use hierarchical_pathfinding::PathCacheConfig;
 	/// assert_eq!(
-	/// 	PathCacheConfig {
-	/// 		chunk_size: 16,
-	/// 		cache_paths: false,
-	/// 		keep_insertions: false,
-	/// 		a_star_fallback: true,
-	/// 		perfect_paths: false,
-	/// 	},
-	/// 	PathCacheConfig::LOW_MEM
+	///     PathCacheConfig {
+	///         chunk_size: 16,
+	///         cache_paths: false,
+	///         keep_insertions: false,
+	///         a_star_fallback: true,
+	///         perfect_paths: false,
+	///     },
+	///     PathCacheConfig::LOW_MEM
 	/// );
 	/// ```
 	pub const LOW_MEM: PathCacheConfig = PathCacheConfig {
@@ -80,14 +80,14 @@ impl PathCacheConfig {
 	/// ```
 	/// # use hierarchical_pathfinding::PathCacheConfig;
 	/// assert_eq!(
-	/// 	PathCacheConfig {
-	/// 		chunk_size: 8,
-	/// 		cache_paths: true,
-	/// 		keep_insertions: true,
-	/// 		a_star_fallback: false,
-	/// 		perfect_paths: false,
-	/// 	},
-	/// 	PathCacheConfig::HIGH_PERFORMANCE
+	///     PathCacheConfig {
+	///         chunk_size: 8,
+	///         cache_paths: true,
+	///         keep_insertions: true,
+	///         a_star_fallback: false,
+	///         perfect_paths: false,
+	///     },
+	///     PathCacheConfig::HIGH_PERFORMANCE
 	/// );
 	/// ```
 	pub const HIGH_PERFORMANCE: PathCacheConfig = PathCacheConfig {

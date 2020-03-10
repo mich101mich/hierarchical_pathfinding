@@ -22,28 +22,28 @@ use std::hash::Hash;
 /// let (A, B, C, D, E) = (0, 1, 2, 3, 4);
 /// let cost_matrix: [[i32; 5]; 5] = [
 /// //    A,  B,  C,  D,  E
-/// 	[-1, -1,  1,  9, -1], // A
-/// 	[-1, -1, -1, -1,  2], // B
-/// 	[ 1, -1, -1,  6, -1], // C
-/// 	[ 9, -1,  6, -1, -1], // D
-/// 	[-1,  2, -1, -1, -1], // E
+///     [-1, -1,  1,  9, -1], // A
+///     [-1, -1, -1, -1,  2], // B
+///     [ 1, -1, -1,  6, -1], // C
+///     [ 9, -1,  6, -1, -1], // D
+///     [-1,  2, -1, -1, -1], // E
 /// ];
 /// # fn euclid_distance(a: usize, b: usize) -> usize {
-/// # 	  [[0, 1, 1, 2, 2], [1, 0, 2, 1, 1], [1, 2, 0, 1, 3], [2, 1, 1, 0, 2], [2, 1, 3, 2, 0]][a][b]
+/// #     [[0, 1, 1, 2, 2], [1, 0, 2, 1, 1], [1, 2, 0, 1, 3], [2, 1, 1, 0, 2], [2, 1, 3, 2, 0]][a][b]
 /// # }
 ///
 /// let result = a_star_search(
-/// 	|point| { // get_all_neighbors
-/// 		cost_matrix[point]
-/// 			.iter()
-/// 			.enumerate()
-/// 			.filter(|&(_, cost)| *cost != -1)
-/// 			.map(|(id, cost)| (id, *cost as usize))
-/// 	},
-/// 	|_| true, // is_walkable
-/// 	A, // start
-/// 	D, // goal
-/// 	|point| euclid_distance(point, D), // heuristic
+///     |point| { // get_all_neighbors
+///         cost_matrix[point]
+///             .iter()
+///             .enumerate()
+///             .filter(|&(_, cost)| *cost != -1)
+///             .map(|(id, cost)| (id, *cost as usize))
+///     },
+///     |_| true, // is_walkable
+///     A, // start
+///     D, // goal
+///     |point| euclid_distance(point, D), // heuristic
 /// );
 ///
 /// assert!(result.is_some());
@@ -66,7 +66,7 @@ use std::hash::Hash;
 /// #     [-1,  2, -1, -1, -1], // E
 /// # ];
 /// # fn euclid_distance(a: usize, b: usize) -> usize {
-/// # 	  [[0, 1, 1, 2, 2], [1, 0, 2, 1, 1], [1, 2, 0, 1, 3], [2, 1, 1, 0, 2], [2, 1, 3, 2, 0]][a][b]
+/// #     [[0, 1, 1, 2, 2], [1, 0, 2, 1, 1], [1, 2, 0, 1, 3], [2, 1, 1, 0, 2], [2, 1, 3, 2, 0]][a][b]
 /// # }
 /// #
 /// # let result = a_star_search(
@@ -81,7 +81,7 @@ use std::hash::Hash;
 /// // ...
 ///     A, // start
 ///     E, // goal
-/// 	|point| euclid_distance(point, E), // heuristic
+///     |point| euclid_distance(point, E), // heuristic
 /// );
 ///
 /// assert_eq!(result, None);
@@ -98,7 +98,7 @@ use std::hash::Hash;
 ///
 /// ## Arguments
 /// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node.
-/// 	The returned value is a Tuple of the `Id` of the neighbor and the Cost to get there.
+///     The returned value is a Tuple of the `Id` of the neighbor and the Cost to get there.
 /// - `is_walkable` - a Function that determines if a Node can be walked over. see [Solid Goals](#solid-goals) for more info
 /// - `start` - the starting Node
 /// - `goal` - the Goal that this function is supposed to search for

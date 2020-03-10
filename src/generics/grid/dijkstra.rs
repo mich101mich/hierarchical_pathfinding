@@ -62,9 +62,9 @@ use std::hash::Hash;
 ///
 /// ## Arguments
 /// - `get_all_neighbors` - a Function that takes a Node and returns all other Nodes reachable from that Node.
-/// 	The returned value is the `Id` of the neighbor.
+///     The returned value is the `Id` of the neighbor.
 /// - `get_cost` - a Function that takes a Node and returns the Cost required to walk across that Node.
-/// 	Negative values indicate Nodes that cannot be walked across.
+///     Negative values indicate Nodes that cannot be walked across.
 /// - `start` - the starting Node
 /// - `goals` - the Goals that this function is supposed to search for
 ///
