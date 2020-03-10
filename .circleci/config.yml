@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/rust:1.31.0-stretch
+      - image: circleci/rust:1.36.0-buster
     steps:
       - checkout
       - restore_cache:
