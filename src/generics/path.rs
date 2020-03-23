@@ -13,7 +13,7 @@ use std::rc::Rc;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(missing_doc_code_examples)]
 pub struct Path<P> {
-	path: Rc<Vec<P>>,
+	path: Rc<[P]>,
 	cost: Cost,
 	is_reversed: bool,
 }
@@ -31,7 +31,28 @@ impl<P> Path<P> {
 	/// ```
 	pub fn new(path: Vec<P>, cost: Cost) -> Path<P> {
 		Path {
-			path: Rc::new(path),
+			path: path.into(),
+			cost,
+			is_reversed: false,
+		}
+	}
+
+	/// creates a new Path with the given sequence of Nodes and total Cost
+	/// ## Examples
+	/// Basic usage:
+	/// ```
+	/// # use hierarchical_pathfinding::generics::Path;
+	/// let path = Path::from_slice(&['a', 'b', 'c'], 42);
+	///
+	/// assert_eq!(path, vec!['a', 'b', 'c']);
+	/// assert_eq!(path.cost(), 42);
+	/// ```
+	pub fn from_slice(path: &[P], cost: Cost) -> Path<P>
+	where
+		P: Clone,
+	{
+		Path {
+			path: path.into(),
 			cost,
 			is_reversed: false,
 		}
@@ -119,17 +140,40 @@ pub struct Iter<'a, P> {
 
 impl<'a, P> Iterator for Iter<'a, P> {
 	type Item = &'a P;
-	fn next(&mut self) -> Option<&'a P> {
+	fn next(&mut self) -> Option<Self::Item> {
 		if self.reversed {
 			self.iter.next_back()
 		} else {
 			self.iter.next()
 		}
 	}
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		self.iter.size_hint()
+	}
 }
 
-impl<P: Eq> PartialEq<Vec<P>> for Path<P> {
+impl<P> DoubleEndedIterator for Iter<'_, P> {
+	fn next_back(&mut self) -> Option<Self::Item> {
+		if self.reversed {
+			self.iter.next()
+		} else {
+			self.iter.next_back()
+		}
+	}
+}
+impl<P> ExactSizeIterator for Iter<'_, P> {}
+impl<P> std::iter::FusedIterator for Iter<'_, P> {}
+
+impl<P: PartialEq> PartialEq<Vec<P>> for Path<P> {
 	fn eq(&self, rhs: &Vec<P>) -> bool {
+		// we can't just use slice's eq because self might be reversed
+		self.len() == rhs.len() && self.iter().zip(rhs.iter()).all(|(a, b)| a == b)
+	}
+}
+
+impl<'a, P: PartialEq> PartialEq<&'a [P]> for Path<P> {
+	fn eq(&self, rhs: &&'a [P]) -> bool {
+		// we can't just use slice's eq because self might be reversed
 		self.len() == rhs.len() && self.iter().zip(rhs.iter()).all(|(a, b)| a == b)
 	}
 }

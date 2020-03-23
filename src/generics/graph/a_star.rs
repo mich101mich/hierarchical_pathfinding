@@ -22,7 +22,7 @@ pub fn a_star_search<NeighborIter: Iterator<Item = (NodeID, Cost)>>(
 	mut heuristic: impl FnMut(NodeID) -> Cost,
 ) -> Option<Path<NodeID>> {
 	if start == goal {
-		return Some(Path::new(vec![start, start], 0));
+		return Some(Path::from_slice(&[start, start], 0));
 	}
 	let mut visited = NodeIDMap::default();
 	let mut next = vec![(start, 0)];

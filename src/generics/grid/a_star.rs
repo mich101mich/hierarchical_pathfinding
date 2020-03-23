@@ -114,7 +114,7 @@ pub fn a_star_search<NeighborIter: Iterator<Item = Point>>(
 	mut heuristic: impl FnMut(Point) -> Cost,
 ) -> Option<Path<Point>> {
 	if start == goal {
-		return Some(Path::new(vec![start, start], 0));
+		return Some(Path::from_slice(&[start, start], 0));
 	}
 	let mut visited = PointMap::default();
 	let mut next = vec![(start, 0)];

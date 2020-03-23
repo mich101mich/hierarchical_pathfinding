@@ -908,14 +908,14 @@ impl<N: Neighborhood> PathCache<N> {
 
 		for (other_id, other_pos) in neighbors {
 			if cost >= 0 {
-				let path = generics::Path::new(vec![pos, other_pos], get_cost(pos) as usize);
+				let path = generics::Path::from_slice(&[pos, other_pos], get_cost(pos) as usize);
 				self.nodes[id]
 					.edges
 					.insert(other_id, PathSegment::new(path, self.config.cache_paths));
 			}
 			if get_cost(other_pos) >= 0 {
 				let other_path =
-					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
+					generics::Path::from_slice(&[other_pos, pos], get_cost(other_pos) as usize);
 
 				self.nodes[other_id]
 					.edges
@@ -940,9 +940,9 @@ impl<N: Neighborhood> PathCache<N> {
 				.to_vec();
 
 			for (other_id, other_pos) in neighbors {
-				let path = generics::Path::new(vec![pos, other_pos], get_cost(pos) as usize);
+				let path = generics::Path::from_slice(&[pos, other_pos], get_cost(pos) as usize);
 				let other_path =
-					generics::Path::new(vec![other_pos, pos], get_cost(other_pos) as usize);
+					generics::Path::from_slice(&[other_pos, pos], get_cost(other_pos) as usize);
 
 				self.nodes[id]
 					.edges
