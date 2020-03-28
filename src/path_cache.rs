@@ -366,11 +366,11 @@ impl<N: Neighborhood> PathCache<N> {
 
 		// start != goal, but latched onto the same neighbor
 		if start_id == goal_id {
-			// if either start_path or goal_path is Some, then it is a 3-step path
-			// if both are Some then they have to be equal since their ids are the same
-			let path = if let Some(middle) = start_path.or(goal_path) {
+			// if both start_path and goal_path are Some, then it is a 3-step path
+			let path = if let Some(middle) = start_path.and(goal_path) {
 				generics::Path::from_slice(&[start, middle, goal], 0)
 			} else {
+				// if either is None, then that point must be on the Node that the other is next to
 				generics::Path::from_slice(&[start, goal], 0)
 			};
 
@@ -607,7 +607,7 @@ impl<N: Neighborhood> PathCache<N> {
 
 			// see the same condition in find_path
 			if start_id == goal_id {
-				let path = if let Some(middle) = start_path.or(goal_path) {
+				let path = if let Some(middle) = start_path.and(goal_path) {
 					generics::Path::from_slice(&[start, middle, goal], 0)
 				} else {
 					generics::Path::from_slice(&[start, goal], 0)
