@@ -640,7 +640,15 @@ impl<N: Neighborhood> PathCache<N> {
 			dirty.entry(chunk_pos).or_insert_with(Vec::new).push(p);
 		}
 
-		// map of chunk_pos => array: [bool; 4] where array[side] == true if chunk[side] needs to be renewed
+		#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+		enum Renew {
+			No,
+			Inner,
+			Corner(Point),
+			All,
+		}
+
+		// map of chunk_pos => array: [Renew; 4] where array[side] says if chunk[side] needs to be renewed
 		let mut renew = PointMap::default();
 
 		for (&cp, positions) in dirty.iter() {
@@ -654,9 +662,30 @@ impl<N: Neighborhood> PathCache<N> {
 					let other_pos = jump_in_dir(cp, dir, size, (0, 0), (self.width, self.height))
 						.expect("Internal Error #2 in PathCache. Please report this");
 
-					// remove the current and other sides
-					renew.entry(cp).or_insert([false; 4])[dir.num()] = true;
-					renew.entry(other_pos).or_insert([false; 4])[dir.opposite().num()] = true;
+					// mark the current and other side
+					let own = &mut renew.entry(cp).or_insert([Renew::No; 4])[dir.num()];
+					let old = *own;
+					if chunk.is_corner(p) {
+						if old == Renew::No || old == Renew::Inner {
+							*own = Renew::Corner(p);
+						} else if let Renew::Corner(p2) = old {
+							if p2 != p {
+								*own = Renew::All;
+							}
+						} else if old != Renew::All {
+							*own = Renew::Corner(p)
+						}
+					} else {
+						// All > Corner > Inner > No, and we don't want to override anything greater than Inner
+						if *own == Renew::No {
+							*own = Renew::Inner;
+						}
+					}
+					let other =
+						&mut renew.entry(other_pos).or_insert([Renew::No; 4])[dir.opposite().num()];
+					if *other == Renew::No {
+						*other = Renew::Inner;
+					}
 				}
 			}
 
@@ -687,7 +716,13 @@ impl<N: Neighborhood> PathCache<N> {
 					.iter()
 					.filter(|id| {
 						let pos = self.nodes[**id].pos;
-						Dir::all().any(|dir| sides[dir.num()] && chunk.at_side(pos, dir))
+						let corner = chunk.is_corner(pos);
+						Dir::all().any(|dir| match sides[dir.num()] {
+							Renew::No => false,
+							Renew::Inner => !corner,
+							Renew::Corner(c) => !corner || c == pos,
+							Renew::All => true,
+						} && chunk.at_side(pos, dir))
 					})
 					.copied()
 					.to_vec()
@@ -715,7 +750,7 @@ impl<N: Neighborhood> PathCache<N> {
 			let chunk = get_chunk_mut!(self, cp);
 
 			for dir in Dir::all() {
-				if sides[dir.num()] {
+				if sides[dir.num()] != Renew::No {
 					chunk.calculate_side_nodes(
 						dir,
 						(self.width, self.height),

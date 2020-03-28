@@ -266,6 +266,11 @@ impl Chunk {
 	pub fn at_any_side(&self, point: Point) -> bool {
 		Dir::all().any(|dir| self.sides[dir.num()] && self.at_side(point, dir))
 	}
+	pub fn is_corner(&self, point: Point) -> bool {
+		Dir::all()
+			.filter(|&dir| self.sides[dir.num()] && self.at_side(point, dir))
+			.count() == 2
+	}
 
 	pub fn top(&self) -> usize {
 		self.pos.1
