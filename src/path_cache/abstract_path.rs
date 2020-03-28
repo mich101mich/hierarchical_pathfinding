@@ -49,6 +49,9 @@ impl<N: Neighborhood> AbstractPath<N> {
 	/// of the Path. Use this method instead of `next()` when
 	/// [`config.cache_paths`](super::PathCacheConfig::cache_paths) is set to false.
 	pub fn safe_next(&mut self, get_cost: impl FnMut(Point) -> isize) -> Option<Point> {
+		self.internal_next(Some(get_cost))
+	}
+	fn internal_next(&mut self, get_cost: Option<impl FnMut(Point) -> isize>) -> Option<Point> {
 		if self.current_index.0 >= self.path.len() {
 			return None;
 		}
@@ -56,7 +59,7 @@ impl<N: Neighborhood> AbstractPath<N> {
 		if let Unknown { start, end, .. } = *current {
 			let path = a_star_search(
 				|p| self.neighborhood.get_all_neighbors(p),
-				get_cost,
+				get_cost.expect("Tried calling next() on a Path that is not fully known. Use safe_next() instead."),
 				start,
 				end,
 				|p| self.neighborhood.heuristic(p, end),
@@ -74,17 +77,24 @@ impl<N: Neighborhood> AbstractPath<N> {
 			self.current_index.1 = 1; // paths include start and end, but we are already at start
 		}
 
-		if let Known(path) = current {
-			let ret = path[self.current_index.1];
-			self.current_index.1 += 1;
-			if self.current_index.1 >= path.len() {
-				self.current_index.0 += 1;
-				self.current_index.1 = 0;
-			}
-			Some(ret)
-		} else {
-			panic!("how.");
+		let path = match current {
+			Known(path) => path,
+			Unknown { .. } => panic!("Internal Error #1 in AbstractPath. Please report this"),
+		};
+
+		let ret = Some(path[self.current_index.1]);
+		self.current_index.1 += 1;
+		if self.current_index.1 >= path.len() {
+			self.current_index.0 += 1;
+			self.current_index.1 = 1;
 		}
+
+		// detect an early finish, since Node Approximation might cause 2 unnecessary Steps
+		if ret == Some(self.end) {
+			self.current_index.0 = self.path.len();
+		}
+
+		ret
 	}
 
 	/// Resolves all unknown sections of the Path.
@@ -140,7 +150,12 @@ impl<N: Neighborhood> AbstractPath<N> {
 	}
 
 	pub(crate) fn add_path_segment(&mut self, path: PathSegment) -> &mut Self {
-		assert!(self.end == path.start(), "Added disconnected PathSegment");
+		assert!(
+			self.end == path.start(),
+			"Added disconnected PathSegment: expected {:?}, got {:?}",
+			self.end,
+			path.start()
+		);
 		self.total_cost += path.cost();
 		self.total_length += path.len();
 		self.end = path.end();
@@ -168,6 +183,10 @@ impl<N: Neighborhood> AbstractPath<N> {
 		self.end = node;
 		self
 	}
+
+	pub(crate) fn set_goal(&mut self, goal: Point) {
+		self.end = goal;
+	}
 }
 
 impl<N: Neighborhood> Iterator for AbstractPath<N> {
@@ -178,26 +197,14 @@ impl<N: Neighborhood> Iterator for AbstractPath<N> {
 	/// Panics if a segment of the Path is not known because [`config.cache_paths`](super::PathCacheConfig::cache_paths)
 	/// is set to false. Use [`safe_next`](AbstractPath::safe_next) in those cases.
 	fn next(&mut self) -> Option<Point> {
-		if self.current_index.0 >= self.path.len() {
-			return None;
-		}
-		let current = &self.path[self.current_index.0];
-		if let Unknown { .. } = *current {
-			panic!(
-				"Tried calling next() on a Path that is not fully known. Use safe_next instead."
-			);
-		}
-
-		if let Known(path) = current {
-			let ret = path[self.current_index.1];
-			self.current_index.1 += 1;
-			if self.current_index.1 >= path.len() {
-				self.current_index.0 += 1;
-				self.current_index.1 = 1;
-			}
-			Some(ret)
-		} else {
-			panic!("how.");
-		}
+		// this is necessary because with just 'self.internal_next(None)' the compiler can't infer the type of 'impl FnMut...'
+		#[allow(unused_assignments)]
+		let mut arg = Some(dummy_cost_fn);
+		arg = None;
+		self.internal_next(arg)
 	}
+}
+
+fn dummy_cost_fn(_: Point) -> isize {
+	0
 }

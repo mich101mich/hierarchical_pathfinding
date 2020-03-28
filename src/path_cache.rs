@@ -342,18 +342,52 @@ impl<N: Neighborhood> PathCache<N> {
 		goal: Point,
 		mut get_cost: impl FnMut(Point) -> isize,
 	) -> Option<AbstractPath<N>> {
-		let mut inserted_start = false;
-		let mut inserted_goal = false;
+		if get_cost(start) < 0 {
+			panic!(
+				"tried to call find_path with {:?} as start, but it is solid",
+				start
+			);
+		}
 
-		let start_id = self.get_node_id(start).unwrap_or_else(|| {
-			inserted_start = true;
-			self.add_node(start, &mut get_cost)
-		});
+		if start == goal {
+			return Some(AbstractPath::from_known_path(
+				self.neighborhood.clone(),
+				generics::Path::from_slice(&[start, start], 0),
+			));
+		}
 
-		let goal_id = self.get_node_id(goal).unwrap_or_else(|| {
-			inserted_goal = true;
-			self.add_node(goal, &mut get_cost)
-		});
+		let neighborhood = self.neighborhood.clone();
+
+		let (start_id, start_path, inserted_start) =
+			self.find_or_insert_node(start, &mut get_cost, |p| neighborhood.heuristic(p, goal));
+
+		let (goal_id, goal_path, inserted_goal) =
+			self.find_or_insert_node(goal, &mut get_cost, |p| neighborhood.heuristic(start, p));
+
+		// start != goal, but latched onto the same neighbor
+		if start_id == goal_id {
+			// if either start_path or goal_path is Some, then it is a 3-step path
+			// if both are Some then they have to be equal since their ids are the same
+			let path = if let Some(middle) = start_path.or(goal_path) {
+				generics::Path::from_slice(&[start, middle, goal], 0)
+			} else {
+				generics::Path::from_slice(&[start, goal], 0)
+			};
+
+			if !self.config.keep_insertions {
+				if inserted_start {
+					self.nodes.remove_node(start_id);
+				}
+				if inserted_goal {
+					self.nodes.remove_node(goal_id);
+				}
+			}
+
+			return Some(AbstractPath::from_known_path(
+				self.neighborhood.clone(),
+				path,
+			));
+		}
 
 		let path = graph::a_star_search(
 			|id| {
@@ -390,13 +424,7 @@ impl<N: Neighborhood> PathCache<N> {
 					path,
 				))
 			} else {
-				let mut ret = AbstractPath::<N>::new(self.neighborhood.clone(), start);
-				for (a, b) in path.iter().zip(path.iter().skip(1)) {
-					let path = &self.nodes[*a].edges[&b];
-					ret.add_path_segment(path.clone());
-				}
-
-				Some(ret)
+				Some(self.resolve_path(&path, start, start_path, goal, goal_path, &mut get_cost))
 			}
 		} else {
 			None
@@ -528,17 +556,73 @@ impl<N: Neighborhood> PathCache<N> {
 		goals: &[Point],
 		mut get_cost: impl FnMut(Point) -> isize,
 	) -> PointMap<AbstractPath<N>> {
-		let start_id = self
-			.get_node_id(start)
-			.unwrap_or_else(|| self.add_node(start, &mut get_cost));
+		if get_cost(start) < 0 {
+			panic!(
+				"tried to call find_path with {:?} as start, but it is solid",
+				start
+			);
+		}
 
-		let goal_ids = goals
-			.iter()
-			.map(|&goal| {
-				self.get_node_id(goal)
-					.unwrap_or_else(|| self.add_node(goal, &mut get_cost))
-			})
-			.to_vec();
+		if goals.is_empty() {
+			return PointMap::default();
+		}
+
+		let goals: PointSet = goals.iter().copied().collect();
+
+		if goals.len() == 1 {
+			let goal = *goals.iter().next().unwrap();
+			if let Some(path) = self.find_path(start, goal, get_cost) {
+				let mut ret = PointMap::default();
+				ret.insert(goal, path);
+				return ret;
+			} else {
+				return PointMap::default();
+			}
+		}
+
+		let neighborhood = self.neighborhood.clone();
+
+		let (start_id, start_path, inserted_start) =
+			self.find_or_insert_node(start, &mut get_cost, |_| 0);
+
+		let mut goal_pos = Vec::with_capacity(goals.len());
+		let mut goal_ids = Vec::with_capacity(goals.len());
+		let mut goal_paths = Vec::with_capacity(goals.len());
+		let mut inserted_goals = Vec::with_capacity(goals.len());
+
+		let mut ret = PointMap::default();
+
+		for goal in goals.into_iter() {
+			if goal == start {
+				let path = AbstractPath::from_known_path(
+					self.neighborhood.clone(),
+					generics::Path::from_slice(&[start, start], 0),
+				);
+				ret.insert(goal, path);
+				continue;
+			}
+
+			let (goal_id, goal_path, inserted_goal) =
+				self.find_or_insert_node(goal, &mut get_cost, |p| neighborhood.heuristic(start, p));
+
+			// see the same condition in find_path
+			if start_id == goal_id {
+				let path = if let Some(middle) = start_path.or(goal_path) {
+					generics::Path::from_slice(&[start, middle, goal], 0)
+				} else {
+					generics::Path::from_slice(&[start, goal], 0)
+				};
+
+				let path = AbstractPath::from_known_path(self.neighborhood.clone(), path);
+				ret.insert(goal, path);
+				continue;
+			}
+
+			goal_pos.push(goal);
+			goal_ids.push(goal_id);
+			goal_paths.push(goal_path);
+			inserted_goals.push(inserted_goal);
+		}
 
 		let paths = graph::dijkstra_search(
 			|id| {
@@ -552,16 +636,22 @@ impl<N: Neighborhood> PathCache<N> {
 			&goal_ids,
 		);
 
-		let mut ret = PointMap::default();
+		for ((id, goal), goal_path) in goal_ids.iter().zip(goal_pos).zip(goal_paths) {
+			if let Some(path) = paths.get(id) {
+				let path =
+					self.resolve_path(path, start, start_path, goal, goal_path, &mut get_cost);
+				ret.insert(goal, path);
+			}
+		}
 
-		for (&goal, id) in goals.iter().zip(goal_ids) {
-			if let Some(path) = paths.get(&id) {
-				let mut ret_path = AbstractPath::<N>::new(self.neighborhood.clone(), start);
-				for (a, b) in path.iter().zip(path.iter().skip(1)) {
-					let path = &self.nodes[*a].edges[&b];
-					ret_path.add_path_segment(path.clone());
+		if !self.config.keep_insertions {
+			if inserted_start {
+				self.nodes.remove_node(start_id);
+			}
+			for (goal_id, inserted_goal) in goal_ids.iter().zip(inserted_goals) {
+				if inserted_goal {
+					self.nodes.remove_node(*goal_id);
 				}
-				ret.insert(goal, ret_path);
 			}
 		}
 
@@ -891,6 +981,72 @@ impl<N: Neighborhood> PathCache<N> {
 	/// Returns the config used to create this PathCache
 	pub fn config(&self) -> PathCacheConfig {
 		self.config
+	}
+
+	fn find_or_insert_node(
+		&mut self,
+		pos: Point,
+		mut get_cost: impl FnMut(Point) -> isize,
+		mut criterion: impl FnMut(Point) -> usize,
+	) -> (NodeID, Option<Point>, bool) {
+		self.get_node_id(pos)
+			.map(|id| (id, None, false))
+			.or_else(|| {
+				// check if a neighboring tile has a Node
+				Dir::all()
+					.filter_map(|dir| get_in_dir(pos, dir, (0, 0), (self.width, self.height)))
+					.filter(|p| get_cost(*p) >= 0)
+					.filter_map(|p| self.get_node_id(p).map(|id| (p, id)))
+					.min_by_key(|(p, _)| criterion(*p))
+					.map(|(p, id)| (id, Some(p), false))
+			})
+			.unwrap_or_else(|| (self.add_node(pos, &mut get_cost), None, true))
+	}
+
+	fn resolve_path(
+		&self,
+		path: &generics::Path<NodeID>,
+		start: Point,
+		start_path: Option<Point>,
+		goal: Point,
+		goal_path: Option<Point>,
+		mut get_cost: impl FnMut(Point) -> isize,
+	) -> AbstractPath<N> {
+		let mut ret = AbstractPath::<N>::new(self.neighborhood.clone(), start);
+
+		let mut skip_beginning = false;
+
+		if let Some(start_path) = start_path {
+			if let PathSegment::Known(ref path) = self.nodes[path[0]].edges[&path[1]] {
+				if path[1] == start {
+					skip_beginning = true;
+				}
+			}
+			ret.add_path_segment(PathSegment::new(
+				generics::Path::from_slice(&[start, start_path], get_cost(start) as usize),
+				true,
+			));
+		}
+
+		for (a, b) in path.iter().zip(path.iter().skip(1)) {
+			let path = &self.nodes[*a].edges[&b];
+			ret.add_path_segment(path.clone());
+		}
+
+		if let Some(goal_path) = goal_path {
+			ret.add_path_segment(PathSegment::new(
+				generics::Path::from_slice(&[goal_path, goal], get_cost(goal_path) as usize),
+				true,
+			));
+			ret.set_goal(goal);
+		}
+
+		if skip_beginning {
+			ret.next();
+			ret.next();
+		}
+
+		ret
 	}
 
 	fn add_node(&mut self, pos: Point, mut get_cost: impl FnMut(Point) -> isize) -> NodeID {
