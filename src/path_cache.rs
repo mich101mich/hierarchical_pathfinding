@@ -1005,7 +1005,19 @@ impl<N: Neighborhood> PathCache<N> {
 						.map(|(p, id)| (id, Some(p), false))
 				}
 			})
-			.unwrap_or_else(|| (self.add_node(pos, &mut get_cost), None, true))
+			.unwrap_or_else(|| {
+				let node = self.add_node(pos, &mut get_cost);
+				if get_cost(pos) < 0 && !self.nodes.values().any(|n| n.edges.contains_key(&node)) {
+					for dir in Dir::all() {
+						if let Some(p) = get_in_dir(pos, dir, (0, 0), (self.width, self.height)) {
+							if get_cost(p) >= 0 && self.get_node_id(p).is_none() {
+								self.add_node(p, &mut get_cost);
+							}
+						}
+					}
+				}
+				(node, None, true)
+			})
 	}
 
 	fn resolve_path(
