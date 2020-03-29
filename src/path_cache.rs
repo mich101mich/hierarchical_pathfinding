@@ -993,12 +993,17 @@ impl<N: Neighborhood> PathCache<N> {
 			.map(|id| (id, None, false))
 			.or_else(|| {
 				// check if a neighboring tile has a Node
-				Dir::all()
-					.filter_map(|dir| get_in_dir(pos, dir, (0, 0), (self.width, self.height)))
-					.filter(|p| get_cost(*p) >= 0)
-					.filter_map(|p| self.get_node_id(p).map(|id| (p, id)))
-					.min_by_key(|(p, _)| criterion(*p))
-					.map(|(p, id)| (id, Some(p), false))
+				if get_cost(pos) < 0 {
+					// but not for walls
+					None
+				} else {
+					Dir::all()
+						.filter_map(|dir| get_in_dir(pos, dir, (0, 0), (self.width, self.height)))
+						.filter(|p| get_cost(*p) >= 0)
+						.filter_map(|p| self.get_node_id(p).map(|id| (p, id)))
+						.min_by_key(|(p, _)| criterion(*p))
+						.map(|(p, id)| (id, Some(p), false))
+				}
 			})
 			.unwrap_or_else(|| (self.add_node(pos, &mut get_cost), None, true))
 	}
