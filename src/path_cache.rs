@@ -992,13 +992,15 @@ impl<N: Neighborhood> PathCache<N> {
 		self.get_node_id(pos)
 			.map(|id| (id, None, false))
 			.or_else(|| {
-				// check if a neighboring tile has a Node
-				if get_cost(pos) < 0 {
-					// but not for walls
+				// check if a neighboring tile has a Node, but not for walls
+				if !self.config.use_nearby_nodes_for_search
+					|| self.config.perfect_paths
+					|| get_cost(pos) < 0
+				{
 					None
 				} else {
-					Dir::all()
-						.filter_map(|dir| get_in_dir(pos, dir, (0, 0), (self.width, self.height)))
+					self.neighborhood
+						.get_all_neighbors(pos)
 						.filter(|p| get_cost(*p) >= 0)
 						.filter_map(|p| self.get_node_id(p).map(|id| (p, id)))
 						.min_by_key(|(p, _)| criterion(*p))
