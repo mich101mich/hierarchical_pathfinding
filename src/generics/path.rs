@@ -1,5 +1,10 @@
 use super::Cost;
-use std::rc::Rc;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::Arc;
+
+#[cfg(target_arch = "wasm32")]
+use std::rc::Rc as Arc; // TODO: What does Arc do on wasm?
 
 /// A generic implementation of a Path
 ///
@@ -13,7 +18,7 @@ use std::rc::Rc;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(missing_doc_code_examples)]
 pub struct Path<P> {
-	path: Rc<[P]>,
+	path: Arc<[P]>,
 	cost: Cost,
 	is_reversed: bool,
 }
