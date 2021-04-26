@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+#[allow(clippy::wrong_self_convention)]
 pub trait IterExt<T>: Iterator<Item = T> {
 	fn to_vec(self) -> Vec<T>;
 }
@@ -36,7 +37,7 @@ impl Dir {
 }
 
 macro_rules! impl_from_into {
-	($type:tt) => {
+    ($($type:ty),+) => {$(
 		impl From<$type> for Dir {
 			fn from(val: $type) -> Dir {
 				match val {
@@ -48,24 +49,15 @@ macro_rules! impl_from_into {
 				}
 			}
 		}
-		impl Into<$type> for Dir {
-			fn into(self) -> $type {
-				self as $type
-			}
-		}
-	};
+        impl From<Dir> for $type {
+            fn from(dir: Dir) -> $type {
+                dir as $type
+            }
+        }
+    )+}
 }
 
-impl_from_into!(u8);
-impl_from_into!(u16);
-impl_from_into!(u32);
-impl_from_into!(u64);
-impl_from_into!(usize);
-impl_from_into!(i8);
-impl_from_into!(i16);
-impl_from_into!(i32);
-impl_from_into!(i64);
-impl_from_into!(isize);
+impl_from_into!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize);
 
 const UNIT_CIRCLE: [(isize, isize); 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
 

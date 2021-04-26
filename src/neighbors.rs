@@ -122,13 +122,20 @@ impl Neighborhood for MooreNeighborhood {
 	fn get_all_neighbors(&self, point: Point) -> Box<dyn Iterator<Item = Point>> {
 		let (width, height) = (self.width, self.height);
 
-		let iter = [(0isize, -1isize), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1)]
-			.iter()
-			.map(move |(dx, dy)| (point.0 as isize + dx, point.1 as isize + dy))
-			.filter(move |(x, y)| {
-				*x >= 0 && *y >= 0 && (*x as usize) < width && (*y as usize) < height
-			})
-			.map(|(x, y)| (x as usize, y as usize));
+		let iter = [
+			(0isize, -1isize),
+			(1, -1),
+			(1, 0),
+			(1, 1),
+			(0, 1),
+			(-1, 1),
+			(-1, 0),
+			(-1, -1),
+		]
+		.iter()
+		.map(move |(dx, dy)| (point.0 as isize + dx, point.1 as isize + dy))
+		.filter(move |(x, y)| *x >= 0 && *y >= 0 && (*x as usize) < width && (*y as usize) < height)
+		.map(|(x, y)| (x as usize, y as usize));
 
 		Box::new(iter)
 	}

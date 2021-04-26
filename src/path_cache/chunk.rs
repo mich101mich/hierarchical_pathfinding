@@ -1,6 +1,8 @@
-use super::{path_segment::PathSegment, utils::*, NodeMap};
 use crate::{
-	neighbors::Neighborhood, node_id::*, NodeID, PathCacheConfig, Point, PointMap, PointSet,
+	graph::{NodeID, NodeIDSet, NodeMap},
+	neighbors::Neighborhood,
+	path::{Path, PathSegment},
+	*,
 };
 
 #[derive(Clone, Debug)]
@@ -213,8 +215,8 @@ impl Chunk {
 		goals: &[Point],
 		get_cost: impl FnMut(Point) -> isize,
 		neighborhood: &N,
-	) -> PointMap<crate::generics::Path<Point>> {
-		crate::generics::grid::dijkstra_search(
+	) -> PointMap<Path<Point>> {
+		grid::dijkstra_search(
 			|p| {
 				neighborhood
 					.get_all_neighbors(p)
@@ -233,8 +235,8 @@ impl Chunk {
 		goal: Point,
 		get_cost: impl FnMut(Point) -> isize,
 		neighborhood: &N,
-	) -> Option<crate::generics::Path<Point>> {
-		crate::generics::grid::a_star_search(
+	) -> Option<Path<Point>> {
+		grid::a_star_search(
 			|p| {
 				neighborhood
 					.get_all_neighbors(p)

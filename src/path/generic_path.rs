@@ -12,7 +12,7 @@ use std::rc::Rc as Arc; // TODO: What does Arc do on wasm?
 /// Note that the individual costs of the steps within the Path cannot be retrieved through this
 /// struct.
 ///
-/// This struct does not own the actual Path, it merely keeps an [`Rc`] to it. This makes cloning
+/// This struct does not own the actual Path, it merely keeps an [`Arc`] to it. This makes cloning
 /// and reversing very efficient, but makes them immutable and limits some ways to access the
 /// contents
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,7 +28,7 @@ impl<P> Path<P> {
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// # use hierarchical_pathfinding::generics::Path;
+	/// # use hierarchical_pathfinding::internals::Path;
 	/// let path = Path::new(vec!['a', 'b', 'c'], 42);
 	///
 	/// assert_eq!(path, vec!['a', 'b', 'c']);
@@ -46,7 +46,7 @@ impl<P> Path<P> {
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// # use hierarchical_pathfinding::generics::Path;
+	/// # use hierarchical_pathfinding::internals::Path;
 	/// let path = Path::from_slice(&['a', 'b', 'c'], 42);
 	///
 	/// assert_eq!(path, vec!['a', 'b', 'c']);
@@ -83,12 +83,12 @@ impl<P> Path<P> {
 	/// `start_cost` is what need to be subtracted, and `end_cost` is what needs to be
 	/// added to the cost in the case of asymmetric paths. Can be set to 0 for symmetric paths.
 	///
-	/// This operation is low cost since Paths are based on [`Rc`]s.
+	/// This operation is low cost since Paths are based on [`Arc`]s.
 	///
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// # use hierarchical_pathfinding::generics::Path;
+	/// # use hierarchical_pathfinding::internals::Path;
 	/// let path = Path::new(vec!['a', 'b', 'c'], 42);
 	/// let reversed = path.reversed(5, 2);
 	///
@@ -112,14 +112,6 @@ impl<P> Path<P> {
 			iter: self.path.iter(),
 			reversed: self.is_reversed,
 		}
-	}
-
-	/// Extracts a Vec from the Path, cloning the data
-	pub fn as_vec(&self) -> Vec<P>
-	where
-		P: Clone,
-	{
-		self.iter().cloned().collect()
 	}
 }
 

@@ -1,30 +1,15 @@
 use crate::{
-	generics::{self, graph, grid},
+	graph::{self, Node, NodeID, NodeMap},
 	neighbors::Neighborhood,
-	NodeID, Point, PointMap, PointSet,
+	path::{AbstractPath, Cost, Path, PathSegment},
+	*,
 };
 
-mod chunk;
-use self::chunk::Chunk;
-
-mod node;
-use self::node::Node;
-
 mod cache_config;
-pub use self::cache_config::PathCacheConfig;
+pub use cache_config::PathCacheConfig;
 
-mod abstract_path;
-pub use self::abstract_path::AbstractPath;
-
-#[macro_use]
-mod node_map;
-use self::node_map::NodeMap;
-
-mod path_segment;
-use self::path_segment::PathSegment;
-
-mod utils;
-use self::utils::*;
+mod chunk;
+use chunk::Chunk;
 
 /// A struct to store the Hierarchical Pathfinding information.
 #[derive(Clone, Debug)]
@@ -73,10 +58,11 @@ impl<N: Neighborhood> PathCache<N> {
 	///     [0, 0, 0, 2, 0],
 	/// ];
 	/// let (width, height) = (grid.len(), grid[0].len());
+	/// type Grid = [[usize; 5]; 5];
 	///
 	/// const COST_MAP: [isize; 3] = [1, 10, -1];
 	///
-	/// fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
+	/// fn cost_fn(grid: &Grid) -> impl '_ + FnMut(Point) -> isize {
 	///     move |(x, y)| COST_MAP[grid[y][x]]
 	/// }
 	///
@@ -352,7 +338,7 @@ impl<N: Neighborhood> PathCache<N> {
 		if start == goal {
 			return Some(AbstractPath::from_known_path(
 				self.neighborhood.clone(),
-				generics::Path::from_slice(&[start, start], 0),
+				Path::from_slice(&[start, start], 0),
 			));
 		}
 
@@ -368,10 +354,10 @@ impl<N: Neighborhood> PathCache<N> {
 		if start_id == goal_id {
 			// if both start_path and goal_path are Some, then it is a 3-step path
 			let path = if let Some(middle) = start_path.and(goal_path) {
-				generics::Path::from_slice(&[start, middle, goal], 0)
+				Path::from_slice(&[start, middle, goal], 0)
 			} else {
 				// if either is None, then that point must be on the Node that the other is next to
-				generics::Path::from_slice(&[start, goal], 0)
+				Path::from_slice(&[start, goal], 0)
 			};
 
 			if !self.config.keep_insertions {
@@ -389,18 +375,7 @@ impl<N: Neighborhood> PathCache<N> {
 			));
 		}
 
-		let path = graph::a_star_search(
-			|id| {
-				self.nodes[id]
-					.edges
-					.iter()
-					.map(|(id, path)| (*id, path.cost()))
-			},
-			|id| self.nodes[id].walk_cost >= 0,
-			start_id,
-			goal_id,
-			|id| self.neighborhood.heuristic(self.nodes[id].pos, goal),
-		);
+		let path = graph::a_star_search(&self.nodes, start_id, goal_id, &self.neighborhood);
 
 		let final_path = if let Some(path) = path {
 			let length: usize = path
@@ -596,7 +571,7 @@ impl<N: Neighborhood> PathCache<N> {
 			if goal == start {
 				let path = AbstractPath::from_known_path(
 					self.neighborhood.clone(),
-					generics::Path::from_slice(&[start, start], 0),
+					Path::from_slice(&[start, start], 0),
 				);
 				ret.insert(goal, path);
 				continue;
@@ -608,9 +583,9 @@ impl<N: Neighborhood> PathCache<N> {
 			// see the same condition in find_path
 			if start_id == goal_id {
 				let path = if let Some(middle) = start_path.and(goal_path) {
-					generics::Path::from_slice(&[start, middle, goal], 0)
+					Path::from_slice(&[start, middle, goal], 0)
 				} else {
-					generics::Path::from_slice(&[start, goal], 0)
+					Path::from_slice(&[start, goal], 0)
 				};
 
 				let path = AbstractPath::from_known_path(self.neighborhood.clone(), path);
@@ -624,17 +599,7 @@ impl<N: Neighborhood> PathCache<N> {
 			inserted_goals.push(inserted_goal);
 		}
 
-		let paths = graph::dijkstra_search(
-			|id| {
-				self.nodes[id]
-					.edges
-					.iter()
-					.map(|(id, path)| (*id, path.cost()))
-			},
-			|id| self.nodes[id].walk_cost >= 0,
-			start_id,
-			&goal_ids,
-		);
+		let paths = graph::dijkstra_search(&self.nodes, start_id, &goal_ids);
 
 		for ((id, goal), goal_path) in goal_ids.iter().zip(goal_pos).zip(goal_paths) {
 			if let Some(path) = paths.get(id) {
@@ -944,9 +909,9 @@ impl<N: Neighborhood> PathCache<N> {
 	///
 	///     visited.insert(node.id());
 	///     
-	///     for neighbor in node.connected().filter(|n| !visited.contains(&n.id())) {
+	///     for (neighbor, cost) in node.connected().filter(|(n, _)| !visited.contains(&n.id())) {
 	///         let other_pos = neighbor.pos();
-	///         // draw Line from pos to other_pos
+	///         // draw Line from pos to other_pos, colored by cost
 	///     }
 	/// }
 	/// ```
@@ -959,8 +924,8 @@ impl<N: Neighborhood> PathCache<N> {
 		for node in self.inspect_nodes() {
 			print!("{} at {:?}: ", node.id(), node.pos());
 
-			for neighbor in node.connected() {
-				print!("{:?}, ", neighbor.pos());
+			for (neighbor, cost) in node.connected() {
+				print!("{:?}({}), ", neighbor.pos(), cost);
 			}
 
 			println!();
@@ -1024,7 +989,7 @@ impl<N: Neighborhood> PathCache<N> {
 
 	fn resolve_path(
 		&self,
-		path: &generics::Path<NodeID>,
+		path: &Path<NodeID>,
 		start: Point,
 		start_path: Option<Point>,
 		goal: Point,
@@ -1034,6 +999,7 @@ impl<N: Neighborhood> PathCache<N> {
 		let mut ret = AbstractPath::<N>::new(self.neighborhood.clone(), start);
 
 		let mut skip_beginning = false;
+		let mut skip_end = false;
 
 		if let Some(start_path) = start_path {
 			if let PathSegment::Known(ref path) = self.nodes[path[0]].edges[&path[1]] {
@@ -1042,7 +1008,7 @@ impl<N: Neighborhood> PathCache<N> {
 				}
 			}
 			ret.add_path_segment(PathSegment::new(
-				generics::Path::from_slice(&[start, start_path], get_cost(start) as usize),
+				Path::from_slice(&[start, start_path], get_cost(start) as usize),
 				true,
 			));
 		}
@@ -1053,16 +1019,24 @@ impl<N: Neighborhood> PathCache<N> {
 		}
 
 		if let Some(goal_path) = goal_path {
+			if let PathSegment::Known(ref path) =
+				self.nodes[path[path.len() - 2]].edges[&path[path.len() - 1]]
+			{
+				if path[path.len() - 2] == goal {
+					skip_end = true;
+				}
+			}
 			ret.add_path_segment(PathSegment::new(
-				generics::Path::from_slice(&[goal_path, goal], get_cost(goal_path) as usize),
+				Path::from_slice(&[goal_path, goal], get_cost(goal_path) as usize),
 				true,
 			));
-			ret.set_goal(goal);
 		}
 
 		if skip_beginning {
-			ret.next();
-			ret.next();
+			ret.skip_beginning((get_cost(start) + get_cost(start_path.unwrap())) as usize);
+		}
+		if skip_end {
+			ret.skip_end((get_cost(goal) + get_cost(goal_path.unwrap())) as usize);
 		}
 
 		ret
@@ -1118,14 +1092,13 @@ impl<N: Neighborhood> PathCache<N> {
 
 		for (other_id, other_pos) in neighbors {
 			if cost >= 0 {
-				let path = generics::Path::from_slice(&[pos, other_pos], get_cost(pos) as usize);
+				let path = Path::from_slice(&[pos, other_pos], get_cost(pos) as usize);
 				self.nodes[id]
 					.edges
 					.insert(other_id, PathSegment::new(path, self.config.cache_paths));
 			}
 			if get_cost(other_pos) >= 0 {
-				let other_path =
-					generics::Path::from_slice(&[other_pos, pos], get_cost(other_pos) as usize);
+				let other_path = Path::from_slice(&[other_pos, pos], get_cost(other_pos) as usize);
 
 				self.nodes[other_id]
 					.edges
@@ -1150,9 +1123,8 @@ impl<N: Neighborhood> PathCache<N> {
 				.to_vec();
 
 			for (other_id, other_pos) in neighbors {
-				let path = generics::Path::from_slice(&[pos, other_pos], get_cost(pos) as usize);
-				let other_path =
-					generics::Path::from_slice(&[other_pos, pos], get_cost(other_pos) as usize);
+				let path = Path::from_slice(&[pos, other_pos], get_cost(pos) as usize);
+				let other_path = Path::from_slice(&[other_pos, pos], get_cost(other_pos) as usize);
 
 				self.nodes[id]
 					.edges
@@ -1183,6 +1155,11 @@ impl<N: Neighborhood> PathCache<N> {
 	}
 }
 
+/// Allows for debugging and visualizing a PathCache.
+///
+/// See [`inspect_nodes`](PathCache::inspect_nodes) for details and an example.
+///
+/// Allows iteration over all Nodes and specific lookup with [`get_node`](CacheInspector::get_node)
 #[derive(Debug)]
 pub struct CacheInspector<'a, N: Neighborhood> {
 	src: &'a PathCache<N>,
@@ -1191,7 +1168,7 @@ pub struct CacheInspector<'a, N: Neighborhood> {
 }
 
 impl<'a, N: Neighborhood> CacheInspector<'a, N> {
-	pub fn new(src: &'a PathCache<N>) -> Self {
+	fn new(src: &'a PathCache<N>) -> Self {
 		CacheInspector {
 			src,
 			nodes: src.nodes.keys().to_vec(),
@@ -1199,6 +1176,7 @@ impl<'a, N: Neighborhood> CacheInspector<'a, N> {
 		}
 	}
 
+	/// Provides
 	pub fn get_node(&self, id: NodeID) -> NodeInspector<N> {
 		NodeInspector::new(self.src, id)
 	}
@@ -1219,6 +1197,13 @@ impl<'a, N: Neighborhood> Iterator for CacheInspector<'a, N> {
 	}
 }
 
+/// Allows for debugging and visualizing a Node
+///
+/// See [`inspect_nodes`](PathCache::inspect_nodes) for details and an example.
+///
+/// Can be obtained by iterating over a [`CacheInspector`] or from [`get_node`](CacheInspector::get_node).
+///
+/// Gives basic info about the Node and an Iterator over all connected Nodes
 #[derive(Debug)]
 pub struct NodeInspector<'a, N: Neighborhood> {
 	src: &'a PathCache<N>,
@@ -1226,25 +1211,28 @@ pub struct NodeInspector<'a, N: Neighborhood> {
 }
 
 impl<'a, N: Neighborhood> NodeInspector<'a, N> {
-	pub fn new(src: &'a PathCache<N>, id: NodeID) -> Self {
+	fn new(src: &'a PathCache<N>, id: NodeID) -> Self {
 		NodeInspector {
 			src,
 			node: &src.nodes[id],
 		}
 	}
 
+	/// The position of the Node on the Grid
 	pub fn pos(&self) -> Point {
 		self.node.pos
 	}
 
+	/// The internal ID
 	pub fn id(&self) -> NodeID {
 		self.node.id
 	}
 
-	pub fn connected(&'a self) -> impl Iterator<Item = NodeInspector<'a, N>> + 'a {
+	/// Provides an iterator over all connected Nodes with the Cost of the Path to that Node
+	pub fn connected(&'a self) -> impl Iterator<Item = (NodeInspector<'a, N>, Cost)> + 'a {
 		self.node
 			.edges
-			.keys()
-			.map(move |id| NodeInspector::new(self.src, *id))
+			.iter()
+			.map(move |(id, path)| (NodeInspector::new(self.src, *id), path.cost()))
 	}
 }

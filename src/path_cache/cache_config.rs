@@ -41,7 +41,7 @@ pub struct PathCacheConfig {
 	/// `false`: only store the Cost of the Path.
 	///
 	/// If set to false, calculating the full Path between two Points takes significantly more time.
-	/// See [`AbstractPath`](crate::AbstractPath) for more details.
+	/// See [`AbstractPath`](crate::internals::AbstractPath) for more details.
 	pub cache_paths: bool,
 	/// `true` (default): any Points inserted when calling find_path or find_paths are left in the Graph.
 	///

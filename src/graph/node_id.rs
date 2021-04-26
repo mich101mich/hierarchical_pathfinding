@@ -1,6 +1,7 @@
 //! A Module with some utilities for working with NodeIDs
 
-use super::NodeID;
+/// The Type used to reference a Node in the abstracted Graph
+pub type NodeID = u32;
 use std::hash::{BuildHasherDefault, Hasher};
 
 /// A specialized [`HashMap`](std::collections::HashMap) for NodeIDs with a faster Hasher

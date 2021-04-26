@@ -1,7 +1,5 @@
-use crate::{
-	generics::{Cost, Path},
-	Point,
-};
+use super::{Cost, Path};
+use crate::Point;
 
 #[derive(Clone, Debug)]
 pub enum PathSegment {

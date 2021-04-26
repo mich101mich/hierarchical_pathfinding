@@ -1,5 +1,5 @@
-use super::{path_segment::PathSegment, Node};
-use crate::{NodeID, Point};
+use super::{Node, NodeID};
+use crate::{path::PathSegment, Point};
 
 macro_rules! invalid_id {
 	() => {
@@ -75,20 +75,20 @@ impl NodeMap {
 		}
 	}
 
-	pub fn iter<'a>(&'a self) -> impl Iterator<Item = (NodeID, &'a Node)> + 'a {
+	pub fn iter(&self) -> impl Iterator<Item = (NodeID, &Node)> + '_ {
 		self.nodes
 			.iter()
 			.enumerate()
 			.filter_map(|(id, opt)| opt.as_ref().map(|node| (id as NodeID, node)))
 	}
-	pub fn keys<'a>(&'a self) -> impl Iterator<Item = NodeID> + 'a {
+	pub fn keys(&self) -> impl Iterator<Item = NodeID> + '_ {
 		self.nodes
 			.iter()
 			.enumerate()
 			.filter(|(_, opt)| opt.is_some())
 			.map(|(id, _)| id as NodeID)
 	}
-	pub fn values<'a>(&'a self) -> impl Iterator<Item = &'a Node> + 'a {
+	pub fn values(&self) -> impl Iterator<Item = &Node> + '_ {
 		self.nodes.iter().filter_map(|opt| opt.as_ref())
 	}
 
@@ -103,18 +103,14 @@ impl NodeMap {
 use std::ops::{Index, IndexMut};
 impl Index<NodeID> for NodeMap {
 	type Output = Node;
-	// TODO: add #[track_caller] once that is possible
+	#[track_caller]
 	fn index(&self, index: NodeID) -> &Node {
-		self.nodes[index as usize]
-			.as_ref()
-			.unwrap_or_else(invalid_id!())
+		self.nodes[index as usize].as_ref().unwrap()
 	}
 }
 impl IndexMut<NodeID> for NodeMap {
-	// TODO: add #[track_caller] once that is possible
+	#[track_caller]
 	fn index_mut(&mut self, index: NodeID) -> &mut Node {
-		self.nodes[index as usize]
-			.as_mut()
-			.unwrap_or_else(invalid_id!())
+		self.nodes[index as usize].as_mut().unwrap()
 	}
 }

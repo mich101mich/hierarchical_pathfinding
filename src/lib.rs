@@ -10,10 +10,11 @@
     unused_import_braces,
     unused_qualifications
 )]
+#![allow(clippy::upper_case_acronyms)]
 
 //! A crate to quickly approximate Paths on a Grid.
 //!
-//! ## Introduction
+//! # Use Case
 //!
 //! Finding Paths on a Grid is an expensive Operation. Consider the following Setup:
 //!
@@ -51,12 +52,12 @@
 //! Paths can be searched using either A* for a Path to a single Tile, or Dijkstra for searching
 //! multiple Targets. It handles solid walls in the Grid and actually finding a Path to a wall.
 //!
-//! ## Examples
-//! Creating the Cache:
-//! ```
-//! use hierarchical_pathfinding::{prelude::*, Point};
+//! # Examples
+//! ##### Creating the Cache
+//! First is the Grid itself. **How it is stored doesn't matter**, but lookup has to be fast.
 //!
-//! // create and initialize Grid
+//! For this example, we shall use a 2D-Array:
+//! ```ignore
 //! // 0 = empty, 1 = swamp, 2 = wall
 //! let mut grid = [
 //!     [0, 2, 0, 0, 0],
@@ -72,32 +73,41 @@
 //!     10, // swamp
 //!     -1, // wall = solid
 //! ];
+//! ```
+//! Now for creating the [`PathCache`]:
+//! ```
+//! # let mut grid = [
+//! #     [0, 2, 0, 0, 0],
+//! #     [0, 2, 2, 2, 0],
+//! #     [0, 1, 0, 0, 0],
+//! #     [0, 1, 0, 2, 0],
+//! #     [0, 0, 0, 2, 0],
+//! # ];
+//! # let (width, height) = (grid.len(), grid[0].len());
+//! # let cost_map = [
+//! #     1,  // empty
+//! #     10, // swamp
+//! #     -1, // wall. Negative number == solid
+//! # ];
+//! use hierarchical_pathfinding::{prelude::*, Point};
 //!
 //! let mut pathfinding = PathCache::new(
-//!     (width, height), // the size of the Grid
-//!     |(x, y)| cost_map[grid[y][x]], // get the cost for walking over a Tile
-//!     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//!     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
+//!     (width, height),   // the size of the Grid
+//!     |(x, y)| cost_map[grid[y][x]],   // get the cost for walking over a Tile
+//!     ManhattanNeighborhood::new(width, height),   // the Neighborhood
+//!     PathCacheConfig { chunk_size: 3, ..Default::default() },   // config
 //! );
 //! ```
-//! Note that the PathCache never actually asks for the Grid itself. This allows the user to
-//! store the Grid in any format they want (Array, Vec, HashMap, kd-tree, ...),
-//! as long as they are somehow able to access a specific (x, y) on the Grid when asked.
-//!
-//! The provided function takes a Position on the Grid as parameter and returns, how "expensive"
-//! it is to walk across the Tile at that Position. This Cost is what will be used for calculating
-//! the Cost of a Path to find the most optimal one. A negative Cost implies that the Tile cannot
-//! be walked across.
+//! The [`PathCache`] never takes the actual Grid, to allow for any storage format to be used
+//! (`Array`, `Vec`, `HashMap`, `kd-tree`, ...). Instead, it takes a callback function that
+//! indicates, how "expensive" walking across a Tile is (negative numbers for solid obstacles).
 //!
 //! Unfortunately, it is necessary to provide this function to every method of PathCache, since
 //! storing it would make the Grid immutable. See also [Updating the PathCache](#updating-the-pathcache).
 //!
-//! **Note**: If copying the Cost function everywhere would create too much Code / less readable
-//! code, [currying](https://en.wikipedia.org/wiki/Currying) may be used:
+//! [Currying](https://en.wikipedia.org/wiki/Currying) can be used to reduce duplication:
 //! ```
 //! # use hierarchical_pathfinding::{prelude::*, Point};
-//! #
-//! # // create and initialize Grid
 //! # // 0 = empty, 1 = swamp, 2 = wall
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
@@ -107,11 +117,11 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! #
-//! const COST_MAP: [isize; 3] = [1, 10, -1];
+//! # type Grid = [[usize; 5]; 5];
+//! const COST_MAP: [isize; 3] = [1, 10, -1]; // now const for ownership reasons
 //!
-//! // only references the Grid when called
-//! fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
+//! // only borrows the Grid when called
+//! fn cost_fn(grid: &Grid) -> impl '_ + FnMut(Point) -> isize {
 //!     move |(x, y)| COST_MAP[grid[y][x]]
 //! }
 //!
@@ -120,32 +130,16 @@
 //!
 //!     // simply call the creator function to take a reference of the Grid
 //!     cost_fn(&grid),
-//!
 //!     // ...
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
 //! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
-//! );
-//!
-//! # let start = (0, 0);
-//! # let goal = (4, 4);
-//! // ...
-//!
-//! let path = pathfinding.find_path(
-//!     start, goal,
-//!
-//!     // function can be reused at any time
-//!     cost_fn(&grid),
-//!
-//! );
+//! # );
 //! ```
 //!
-//! ### Pathfinding
+//! ##### Pathfinding
 //! Finding the Path to a single Goal:
 //! ```
 //! # use hierarchical_pathfinding::{prelude::*, Point};
-//! #
-//! # // create and initialize Grid
-//! # // 0 = empty, 1 = swamp, 2 = wall
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -154,13 +148,9 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! #
-//! # const COST_MAP: [isize; 3] = [1, 10, -1];
-//! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
-//! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
@@ -179,7 +169,7 @@
 //! );
 //!
 //! assert!(path.is_some());
-//! let mut path = path.unwrap();
+//! let path = path.unwrap();
 //!
 //! assert_eq!(path.cost(), 12);
 //! ```
@@ -188,9 +178,6 @@
 //! Finding multiple Goals:
 //! ```
 //! # use hierarchical_pathfinding::{prelude::*, Point};
-//! #
-//! # // create and initialize Grid
-//! # // 0 = empty, 1 = swamp, 2 = wall
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -199,13 +186,9 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! #
-//! # const COST_MAP: [isize; 3] = [1, 10, -1];
-//! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
-//! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
@@ -231,27 +214,28 @@
 //! ```
 //! For more information, see [`find_paths`](PathCache::find_paths).
 //!
-//! ### Using a Path
-//! The easiest information obtainable from a Path is its existence. Despite being an
-//! approximation of an optimal Path, HPA* is 100% correct when it comes to the existence
-//! of a Path. Meaning that if HPA* cannot find a Path, no one can, and if HPA* returns a Path,
-//! it is valid, given correct Neighborhood and Cost functions.
+//! ##### Using a Path
+//! - Path exists: `path.is_some()` | `paths.contains_key()`
+//!   - Useful as a Heuristic for other Algorithms
+//!   - **100% correct** (`true` if and only if path can be found)
+//! - Total Cost of the Path: `path.cost()`
+//!   - Correct for this Path, may be slightly larger than for optimal Path
+//!   - The cost is simply returned; `cost()` does no calculations
+//! - Total Length of the Path: `path.length()`
+//!   - Correct for this Path, may be slightly longer than for optimal Path
+//!   - The length is simply returned; `length()` does no calculations
+//! - Next Position: `path.next()` | `path.safe_next(cost_fn)`
+//!   - [`safe_next`](internals::AbstractPath::safe_next) is needed if [`config.cache_paths`](crate::PathCacheConfig::cache_paths) is set to `false`
+//!   - can be called several times to iterate Path
+//!   - path implements `Iterator<Item = (usize, usize)>`
+//! - Entire Path: `path.resolve(cost_fn)`
+//!   - Returns a `Vec<(usize, usize)>`
 //!
-//! The next step is to obtain information about the Path itself. The part that is always
-//! available is the total Cost of the Path. Once again, it is just an approximation. However,
-//! it gives a pretty good estimate of the actual Cost, with only minimal deviations.
-//!
-//! As for following the Path, HPA* was designed to allow Units to immediately start moving
-//! and minimize lost time when the surroundings change in a way that alters the Path.
-//! That is why it does not calculate the full Path immediately. It does, however, generate
-//! the first steps of the Path without too much overhead. That is why it is advised to
-//! mostly use the `next()` method of the returned Path for a few steps.
-//!
+//! Note that [`resolve`](internals::AbstractPath::resolve) calculates any missing segments (if [`config.cache_paths`](crate::PathCacheConfig::cache_paths) ` == false`)
+//! and allocates a [`Vec`](std::vec::Vec) with the resulting Points. Not recommended if only the
+//! beginning of the Path is needed.
 //! ```
 //! # use hierarchical_pathfinding::{prelude::*, Point};
-//! #
-//! # // create and initialize Grid
-//! # // 0 = empty, 1 = swamp, 2 = wall
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -260,13 +244,9 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! #
-//! # const COST_MAP: [isize; 3] = [1, 10, -1];
-//! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
-//! #
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
@@ -299,17 +279,20 @@
 //!
 //! player.move_to(path.next().unwrap());
 //! assert_eq!(player.pos, (0, 2));
+//!
+//! // iterating is possible
+//! for new_pos in path {
+//!     player.move_to(new_pos);
+//! }
+//! assert_eq!(player.pos, goal);
 //! ```
 //!
-//! ### Updating the PathCache
+//! ##### Updating the PathCache
 //! The PathCache does not contain a copy or reference of the Grid for mutability and Ownership reasons.
 //! This means however, that the user is responsible for storing and maintaining both the Grid and the PathCache.
 //! It is also necessary to update the PathCache when the Grid has changed to keep it consistent:
-//! ```
+//! ```should_panic
 //! # use hierarchical_pathfinding::{prelude::*, Point};
-//! #
-//! # // create and initialize Grid
-//! # // 0 = empty, 1 = swamp, 2 = wall
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -318,13 +301,41 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! #
-//! # const COST_MAP: [isize; 3] = [1, 10, -1];
-//! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
+//! # let mut pathfinding = PathCache::new(
+//! #     (width, height),
+//! #     cost_fn(&grid),
+//! #     ManhattanNeighborhood::new(width, height),
+//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! # );
 //! #
+//! let (start, goal) = ((0, 0), (2, 0));
+//!
+//! let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+//! assert!(path.is_none()); // from previous example
+//!
+//! // Clear a way to the goal
+//! grid[0][1] = 0;
+//!
+//! let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+//! assert!(path.is_some()); // there should be a Path now!
+//! ```
+//! [`tiles_changed`](PathCache::tiles_changed) must be called with all changed Tiles:
+//! ```
+//! # use hierarchical_pathfinding::{prelude::*, Point};
+//! # let mut grid = [
+//! #     [0, 2, 0, 0, 0],
+//! #     [0, 2, 2, 2, 2],
+//! #     [0, 1, 0, 0, 0],
+//! #     [0, 1, 0, 2, 0],
+//! #     [0, 0, 0, 2, 0],
+//! # ];
+//! # let (width, height) = (grid.len(), grid[0].len());
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! #     move |(x, y)| [1, 10, -1][grid[y][x]]
+//! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
@@ -337,36 +348,27 @@
 //! let path = pathfinding.find_path(start, goal, cost_fn(&grid));
 //! assert!(path.is_none());
 //!
+//! // Clear a way to the goal
 //! grid[0][1] = 0;
-//! grid[4][4] = 2;
-//!
-//! assert_eq!(grid, [
-//!     [0, 0, 0, 0, 0],
-//!     [0, 2, 2, 2, 2],
-//!     [0, 1, 0, 0, 0],
-//!     [0, 1, 0, 2, 0],
-//!     [0, 0, 0, 2, 2],
-//! ]);
 //!
 //! pathfinding.tiles_changed(
-//!     &[(1, 0), (4, 4)],
+//!     &[(1, 0)],
 //!     cost_fn(&grid),
 //! );
 //!
 //! let path = pathfinding.find_path(start, goal, cost_fn(&grid));
 //! assert!(path.is_some());
 //! ```
+//! `tiles_changed` takes a slice of Points, and it is recommended to bundle changes together for
+//! performance reasons.
 //!
-//! ### Configuration
+//! ##### Configuration
 //! The last parameter for PathCache::new is a [`PathCacheConfig`] object with different options to have more control over the generated PathCache.
 //! These options are mostly used to adjust the balance between Performance and Memory Usage, with the default values aiming more at Performance.
 //! The PathCacheConfig struct also provides defaults for low Memory Usage [`PathCacheConfig::LOW_MEM`]
 //! or best Performance [`PathCacheConfig::HIGH_PERFORMANCE`]
 //! ```
 //! # use hierarchical_pathfinding::{prelude::*, Point};
-//! #
-//! # // create and initialize Grid
-//! # // 0 = empty, 1 = swamp, 2 = wall
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -375,11 +377,8 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! #
-//! # const COST_MAP: [isize; 3] = [1, 10, -1];
-//! #
-//! # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-//! #     move |(x, y)| COST_MAP[grid[y][x]]
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //!
 //! let mut pathfinding = PathCache::new(
@@ -395,9 +394,6 @@
 //! assert_eq!(pathfinding.config().chunk_size, 3);
 //! ```
 
-/// The Type used to reference a Node in the abstracted Graph
-pub type NodeID = u32;
-
 /// A shorthand for Points on the grid
 pub type Point = (usize, usize);
 
@@ -405,13 +401,23 @@ type PointMap<V> = fnv::FnvHashMap<Point, V>;
 type PointSet = fnv::FnvHashSet<Point>;
 
 mod path_cache;
-pub use self::path_cache::{AbstractPath, PathCache, PathCacheConfig};
+pub use self::path_cache::{PathCache, PathCacheConfig};
+
+mod path;
+
+mod utils;
+pub(crate) use utils::*;
 
 pub mod neighbors;
 
-pub mod generics;
+mod graph;
+mod grid;
 
-pub mod node_id;
+/// Internal stuff that is returned by other function
+pub mod internals {
+    pub use crate::path::{AbstractPath, Path};
+    pub use crate::path_cache::{CacheInspector, NodeInspector};
+}
 
 /// The prelude for this crate.
 ///
@@ -421,6 +427,6 @@ pub mod node_id;
 pub mod prelude {
     pub use crate::{
         neighbors::{ManhattanNeighborhood, MooreNeighborhood, Neighborhood},
-        AbstractPath, PathCache, PathCacheConfig,
+        PathCache, PathCacheConfig,
     };
 }
