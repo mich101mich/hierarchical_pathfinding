@@ -14,15 +14,15 @@ pub type NodeIDSet = std::collections::HashSet<NodeID, BuildHasherDefault<NodeID
 pub struct NodeIDHasher(u64);
 
 impl Hasher for NodeIDHasher {
-	/// panics, since only NodeIDs are supposed to be used
-	fn write(&mut self, _: &[u8]) {
-		unreachable!("This Hasher only works with NodeIDs")
-	}
-	/// Writes a single NodeID into this hasher.
-	fn write_u32(&mut self, id: NodeID) {
-		self.0 = id as u64
-	}
-	fn finish(&self) -> u64 {
-		self.0
-	}
+    /// panics, since only NodeIDs are supposed to be used
+    fn write(&mut self, _: &[u8]) {
+        unreachable!("This Hasher only works with NodeIDs")
+    }
+    /// Writes a single NodeID into this hasher.
+    fn write_u32(&mut self, id: NodeID) {
+        self.0 = id as u64
+    }
+    fn finish(&self) -> u64 {
+        self.0
+    }
 }
