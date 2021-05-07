@@ -7,6 +7,7 @@ pub fn dijkstra_search(
 	nodes: &NodeMap,
 	start: NodeID,
 	goals: &[NodeID],
+	only_closest_goal: bool,
 ) -> NodeIDMap<Path<NodeID>> {
 	let mut visited = NodeIDMap::default();
 	let mut next = BinaryHeap::new();
@@ -26,7 +27,7 @@ pub fn dijkstra_search(
 
 		if remaining_goals.remove(&current_id) {
 			goal_costs.insert(current_id, current_cost);
-			if remaining_goals.is_empty() {
+			if only_closest_goal || remaining_goals.is_empty() {
 				break;
 			}
 		}
@@ -35,11 +36,6 @@ pub fn dijkstra_search(
 
 		for (&other_id, path) in current.edges.iter() {
 			let other_cost = current_cost + path.cost();
-			let other = &nodes[other_id];
-
-			if other.walk_cost < 0 && !remaining_goals.contains(&other_id) {
-				continue;
-			}
 
 			let mut needs_visit = true;
 			if let Some((prev_cost, prev_id)) = visited.get_mut(&other_id) {

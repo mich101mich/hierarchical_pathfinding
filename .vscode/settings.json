@@ -3,7 +3,4 @@
 		"Hasher",
 		"Neumann"
 	],
-	"files.exclude": {
-		"**/.github": true
-	}
 }

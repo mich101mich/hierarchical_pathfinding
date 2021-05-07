@@ -90,78 +90,83 @@ where
 	Some(Path::new(steps, visited[&goal].0))
 }
 
-#[test]
-fn grid_a_star_unreachable_goal() {
-	use crate::prelude::*;
+#[cfg(test)]
+mod tests {
+	use super::*;
 
-	// create and initialize Grid
-	// 0 = empty, 1 = swamp, 2 = wall
-	let grid = [
-		[0, 2, 0, 0, 0],
-		[0, 2, 2, 2, 2],
-		[0, 1, 0, 0, 0],
-		[0, 1, 0, 2, 0],
-		[0, 0, 0, 2, 0],
-	];
-	let (width, height) = (grid.len(), grid[0].len());
+	#[test]
+	fn unreachable_goal() {
+		use crate::prelude::*;
 
-	let neighborhood = ManhattanNeighborhood::new(width, height);
+		// create and initialize Grid
+		// 0 = empty, 1 = swamp, 2 = wall
+		let grid = [
+			[0, 2, 0, 0, 0],
+			[0, 2, 2, 2, 2],
+			[0, 1, 0, 0, 0],
+			[0, 1, 0, 2, 0],
+			[0, 0, 0, 2, 0],
+		];
+		let (width, height) = (grid.len(), grid[0].len());
 
-	const COST_MAP: [isize; 3] = [1, 10, -1];
+		let neighborhood = ManhattanNeighborhood::new(width, height);
 
-	fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
-		move |(x, y)| COST_MAP[grid[y][x]]
+		const COST_MAP: [isize; 3] = [1, 10, -1];
+
+		fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+			move |(x, y)| COST_MAP[grid[y][x]]
+		}
+
+		let start = (0, 0);
+		let goal = (2, 0);
+
+		let path = a_star_search(
+			|point| neighborhood.get_all_neighbors(point),
+			cost_fn(&grid),
+			start,
+			goal,
+			|point| neighborhood.heuristic(point, goal),
+		);
+
+		assert!(path.is_none());
 	}
 
-	let start = (0, 0);
-	let goal = (2, 0);
+	#[test]
+	fn basic() {
+		use crate::prelude::*;
 
-	let path = a_star_search(
-		|point| neighborhood.get_all_neighbors(point),
-		cost_fn(&grid),
-		start,
-		goal,
-		|point| neighborhood.heuristic(point, goal),
-	);
+		// create and initialize Grid
+		// 0 = empty, 1 = swamp, 2 = wall
+		let grid = [
+			[0, 2, 0, 0, 0],
+			[0, 2, 2, 2, 2],
+			[0, 1, 0, 0, 0],
+			[0, 1, 0, 2, 0],
+			[0, 0, 0, 2, 0],
+		];
+		let (width, height) = (grid.len(), grid[0].len());
 
-	assert!(path.is_none());
-}
+		let neighborhood = ManhattanNeighborhood::new(width, height);
 
-#[test]
-fn grid_a_star_basic() {
-	use crate::prelude::*;
+		const COST_MAP: [isize; 3] = [1, 10, -1];
 
-	// create and initialize Grid
-	// 0 = empty, 1 = swamp, 2 = wall
-	let grid = [
-		[0, 2, 0, 0, 0],
-		[0, 2, 2, 2, 2],
-		[0, 1, 0, 0, 0],
-		[0, 1, 0, 2, 0],
-		[0, 0, 0, 2, 0],
-	];
-	let (width, height) = (grid.len(), grid[0].len());
+		fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+			move |(x, y)| COST_MAP[grid[y][x]]
+		}
 
-	let neighborhood = ManhattanNeighborhood::new(width, height);
+		let start = (0, 0);
+		let goal = (4, 4);
+		let path = a_star_search(
+			|point| neighborhood.get_all_neighbors(point),
+			cost_fn(&grid),
+			start,
+			goal,
+			|point| neighborhood.heuristic(point, goal),
+		);
 
-	const COST_MAP: [isize; 3] = [1, 10, -1];
+		assert!(path.is_some());
+		let path = path.unwrap();
 
-	fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
-		move |(x, y)| COST_MAP[grid[y][x]]
+		assert_eq!(path.cost(), 12);
 	}
-
-	let start = (0, 0);
-	let goal = (4, 4);
-	let path = a_star_search(
-		|point| neighborhood.get_all_neighbors(point),
-		cost_fn(&grid),
-		start,
-		goal,
-		|point| neighborhood.heuristic(point, goal),
-	);
-
-	assert!(path.is_some());
-	let path = path.unwrap();
-
-	assert_eq!(path.cost(), 12);
 }

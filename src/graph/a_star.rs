@@ -34,10 +34,6 @@ pub fn a_star_search(
 			let other_cost = current_cost + path.cost();
 			let other = &nodes[other_id];
 
-			if other_id != goal && other.walk_cost < 0 {
-				continue;
-			}
-
 			let mut needs_visit = true;
 			if let Some((prev_cost, prev_id)) = visited.get_mut(&other_id) {
 				if *prev_cost > other_cost {

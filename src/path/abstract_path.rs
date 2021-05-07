@@ -14,7 +14,7 @@ use crate::{grid::a_star_search, neighbors::Neighborhood, Point};
 /// segments are reached.**
 ///
 /// **Warning: Keeping an AbstractPath after changing the Grid, or using a different cost function,
-/// leads to undefined behavior and panics.**
+/// leads to panics and wrong results.**
 ///
 /// **You have been warned**
 #[derive(Debug, Clone)]
@@ -28,7 +28,6 @@ pub struct AbstractPath<N: Neighborhood> {
 	steps_taken: usize,
 }
 
-#[allow(dead_code)]
 impl<N: Neighborhood> AbstractPath<N> {
 	/// Returns the total cost of this Path.
 	/// This value is always known and requires no further calculations.
@@ -37,18 +36,22 @@ impl<N: Neighborhood> AbstractPath<N> {
 	}
 
 	/// Returns the total length of this Path.
+	///
 	/// This value is always known and requires no further calculations.
+	///
+	/// Note that the [`len`](AbstractPath::len) method is provided by [`ExactIterator`] and tells
+	/// the remaining elements, whereas the one stays constant.
 	pub fn length(&self) -> usize {
 		self.total_length
 	}
 
 	/// A variant of [`Iterator::next()`](#impl-Iterator) that can resolve unknown segments
 	/// of the Path. Use this method instead of `next()` when
-	/// [`config.cache_paths`](crate::PathCacheConfig::cache_paths) is set to false.
+	/// [`config.cache_paths`](crate::PathCacheConfig::cache_paths) is set to `false`.
 	pub fn safe_next(&mut self, get_cost: impl FnMut(Point) -> isize) -> Option<Point> {
 		self.internal_next(Some(get_cost))
 	}
-	fn internal_next(&mut self, get_cost: Option<impl FnMut(Point) -> isize>) -> Option<Point> {
+	fn internal_next<F: FnMut(Point) -> isize>(&mut self, get_cost: Option<F>) -> Option<Point> {
 		if self.current_index.0 >= self.path.len() {
 			return None;
 		}
@@ -77,7 +80,7 @@ impl<N: Neighborhood> AbstractPath<N> {
 		let path = match current {
 			PathSegment::Known(path) => path,
 			PathSegment::Unknown { .. } => {
-				panic!("Internal Error #1 in AbstractPath. Please report this")
+				unreachable!()
 			}
 		};
 
@@ -88,11 +91,6 @@ impl<N: Neighborhood> AbstractPath<N> {
 			self.current_index.1 = 1;
 		}
 
-		// detect an early finish, since Node Approximation might cause 2 unnecessary Steps
-		if ret == Some(self.end) {
-			self.current_index.0 = self.path.len();
-		}
-
 		self.steps_taken += 1;
 
 		ret
@@ -101,13 +99,9 @@ impl<N: Neighborhood> AbstractPath<N> {
 	/// Resolves all unknown sections of the Path.
 	///
 	/// if [`config.cache_paths`](crate::PathCacheConfig::cache_paths) is set to true,
-	/// then calling this method is similar to calling `path.collect::<Vec<Point>>()`.
-	///
-	/// The return value is a [`Path`], which is
-	/// essentially a Vec<Point>, but with a `cost` member, since this path is consumed by
-	/// `resolve`
+	/// then calling this method is similar to calling `path.collect::<Vec<_>>()`.
 	pub fn resolve(mut self, mut get_cost: impl FnMut(Point) -> isize) -> Vec<Point> {
-		let mut result = Vec::with_capacity(self.total_length);
+		let mut result = Vec::with_capacity(self.len());
 
 		while let Some(pos) = self.safe_next(&mut get_cost) {
 			result.push(pos);
@@ -131,7 +125,7 @@ impl<N: Neighborhood> AbstractPath<N> {
 		let end = path[path.len() - 1];
 		AbstractPath {
 			total_cost: path.cost(),
-			total_length: path.len(),
+			total_length: path.len() - 1,
 			path: vec![PathSegment::Known(path)],
 			..AbstractPath::new(neighborhood, end)
 		}
@@ -145,20 +139,27 @@ impl<N: Neighborhood> AbstractPath<N> {
 			path.start()
 		);
 		self.total_cost += path.cost();
-		self.total_length += path.len();
+		self.total_length += path.len() - 1;
 		self.end = path.end();
 		self.path.push(path);
 		self
 	}
 
 	pub(crate) fn add_path(&mut self, path: Path<Point>) -> &mut Self {
+		assert!(
+			self.end == path[0],
+			"Added disconnected Path: expected {:?}, got {:?}",
+			self.end,
+			path[0]
+		);
 		self.total_cost += path.cost();
-		self.total_length += path.len();
+		self.total_length += path.len() - 1;
 		self.end = path[path.len() - 1];
 		self.path.push(PathSegment::Known(path));
 		self
 	}
 
+	#[allow(dead_code)]
 	pub(crate) fn add_node(&mut self, node: Point, cost: Cost, len: usize) -> &mut Self {
 		self.path.push(PathSegment::Unknown {
 			start: self.end,
@@ -171,18 +172,6 @@ impl<N: Neighborhood> AbstractPath<N> {
 		self.end = node;
 		self
 	}
-
-	pub(crate) fn skip_beginning(&mut self, cost_reduction: Cost) {
-		self.total_cost -= cost_reduction;
-		self.total_length -= 2;
-		self.next().unwrap();
-		self.next().unwrap();
-		self.steps_taken = 0;
-	}
-	pub(crate) fn skip_end(&mut self, cost_reduction: Cost) {
-		self.total_cost -= cost_reduction;
-		self.total_length -= 2;
-	}
 }
 
 impl<N: Neighborhood> Iterator for AbstractPath<N> {
@@ -191,13 +180,9 @@ impl<N: Neighborhood> Iterator for AbstractPath<N> {
 	///
 	/// ## Panics
 	/// Panics if a segment of the Path is not known because [`config.cache_paths`](crate::PathCacheConfig::cache_paths)
-	/// is set to false. Use [`safe_next`](AbstractPath::safe_next) in those cases.
+	/// is set to `false`. Use [`safe_next`](AbstractPath::safe_next) in those cases.
 	fn next(&mut self) -> Option<Point> {
-		// this is necessary because with just 'self.internal_next(None)' the compiler can't infer the type of 'impl FnMut...'
-		#[allow(unused_assignments)]
-		let mut arg = Some(dummy_cost_fn);
-		arg = None;
-		self.internal_next(arg)
+		self.internal_next::<fn((usize, usize)) -> isize>(None)
 	}
 	fn size_hint(&self) -> (usize, Option<usize>) {
 		let len = self.total_length - self.steps_taken;
@@ -226,6 +211,118 @@ impl<N: Neighborhood> Iterator for AbstractPath<N> {
 impl<N: Neighborhood> ExactSizeIterator for AbstractPath<N> {}
 impl<N: Neighborhood> std::iter::FusedIterator for AbstractPath<N> {}
 
-fn dummy_cost_fn(_: Point) -> isize {
-	0
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn next() {
+		let neigh = crate::neighbors::ManhattanNeighborhood::new(100, 100);
+		let mut path = AbstractPath::from_known_path(
+			neigh,
+			Path::from_slice(&[(99, 99), (0, 0), (1, 1), (2, 2), (3, 3)], 3),
+		);
+		path.add_path(Path::from_slice(&[(3, 3), (4, 4), (5, 5)], 5));
+		assert_eq!(path.next(), Some((0, 0)));
+		assert_eq!(path.next(), Some((1, 1)));
+		assert_eq!(path.next(), Some((2, 2)));
+		assert_eq!(path.next(), Some((3, 3)));
+		assert_eq!(path.next(), Some((4, 4)));
+		assert_eq!(path.next(), Some((5, 5)));
+		assert_eq!(path.next(), None);
+		assert_eq!(path.next(), None);
+		assert_eq!(path.next(), None);
+	}
+
+	#[test]
+	fn nth() {
+		let neigh = crate::neighbors::ManhattanNeighborhood::new(100, 100);
+		let mut path = AbstractPath::from_known_path(
+			neigh,
+			Path::from_slice(
+				&[(99, 99), (0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5)],
+				3,
+			),
+		);
+		{
+			let mut path = path.clone();
+			assert_eq!(path.nth(3), Some((3, 3)));
+			assert_eq!(path.next(), Some((4, 4)));
+			assert_eq!(path.nth(1), None);
+		}
+
+		path.add_path(Path::from_slice(&[(5, 5), (6, 6), (7, 7)], 5));
+
+		{
+			let mut path = path.clone();
+			assert_eq!(path.nth(3), Some((3, 3)));
+			assert_eq!(path.nth(3), Some((7, 7)));
+			assert_eq!(path.nth(3), None);
+		}
+		{
+			let mut path = path.clone();
+			assert_eq!(path.nth(7), Some((7, 7)));
+		}
+		assert_eq!(path.nth(100), None);
+	}
+
+	#[test]
+	fn size_hint_and_len() {
+		let neigh = crate::neighbors::ManhattanNeighborhood::new(100, 100);
+		let mut path = AbstractPath::from_known_path(
+			neigh,
+			Path::from_slice(&[(99, 99), (0, 0), (1, 1), (2, 2), (3, 3)], 3),
+		);
+		path.add_path(Path::from_slice(&[(3, 3), (4, 4), (5, 5)], 5));
+		assert_eq!(path.size_hint(), (6, Some(6)));
+		assert_eq!(path.len(), 6);
+		assert_eq!(path.len(), path.length());
+		assert_eq!(path.next(), Some((0, 0)));
+
+		assert_eq!(path.size_hint(), (5, Some(5)));
+		assert_eq!(path.len(), 5);
+		assert_eq!(path.next(), Some((1, 1)));
+
+		assert_eq!(path.size_hint(), (4, Some(4)));
+		assert_eq!(path.len(), 4);
+		assert_eq!(path.next(), Some((2, 2)));
+
+		assert_eq!(path.size_hint(), (3, Some(3)));
+		assert_eq!(path.len(), 3);
+		assert_eq!(path.next(), Some((3, 3)));
+
+		assert_eq!(path.size_hint(), (2, Some(2)));
+		assert_eq!(path.len(), 2);
+		assert_eq!(path.next(), Some((4, 4)));
+
+		assert_eq!(path.size_hint(), (1, Some(1)));
+		assert_eq!(path.len(), 1);
+		assert_eq!(path.next(), Some((5, 5)));
+
+		assert_eq!(path.size_hint(), (0, Some(0)));
+		assert_eq!(path.len(), 0);
+		assert_eq!(path.next(), None);
+
+		assert_eq!(path.len(), 0);
+		assert_eq!(path.size_hint(), (0, Some(0)));
+	}
+
+	#[test]
+	fn count_and_last() {
+		let neigh = crate::neighbors::ManhattanNeighborhood::new(100, 100);
+		let mut path = AbstractPath::from_known_path(
+			neigh,
+			Path::from_slice(&[(99, 99), (0, 0), (1, 1), (2, 2), (3, 3)], 3),
+		);
+		path.add_path(Path::from_slice(&[(3, 3), (4, 4), (5, 5)], 5));
+
+		let mut cnt = 0;
+		let mut last = (99, 99);
+		for p in path.clone() {
+			cnt += 1;
+			last = p;
+		}
+		assert_eq!(path.clone().count(), cnt);
+		assert_eq!(path.last(), Some(last));
+	}
 }

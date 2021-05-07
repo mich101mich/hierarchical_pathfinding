@@ -89,7 +89,7 @@
 //! #     10, // swamp
 //! #     -1, // wall. Negative number == solid
 //! # ];
-//! use hierarchical_pathfinding::{prelude::*, Point};
+//! use hierarchical_pathfinding::prelude::*;
 //!
 //! let mut pathfinding = PathCache::new(
 //!     (width, height),   // the size of the Grid
@@ -107,7 +107,7 @@
 //!
 //! [Currying](https://en.wikipedia.org/wiki/Currying) can be used to reduce duplication:
 //! ```
-//! # use hierarchical_pathfinding::{prelude::*, Point};
+//! # use hierarchical_pathfinding::prelude::*;
 //! # // 0 = empty, 1 = swamp, 2 = wall
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
@@ -121,7 +121,7 @@
 //! const COST_MAP: [isize; 3] = [1, 10, -1]; // now const for ownership reasons
 //!
 //! // only borrows the Grid when called
-//! fn cost_fn(grid: &Grid) -> impl '_ + FnMut(Point) -> isize {
+//! fn cost_fn(grid: &Grid) -> impl '_ + FnMut((usize, usize)) -> isize {
 //!     move |(x, y)| COST_MAP[grid[y][x]]
 //! }
 //!
@@ -139,7 +139,7 @@
 //! ##### Pathfinding
 //! Finding the Path to a single Goal:
 //! ```
-//! # use hierarchical_pathfinding::{prelude::*, Point};
+//! # use hierarchical_pathfinding::prelude::*;
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -148,7 +148,7 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
@@ -177,7 +177,7 @@
 //!
 //! Finding multiple Goals:
 //! ```
-//! # use hierarchical_pathfinding::{prelude::*, Point};
+//! # use hierarchical_pathfinding::prelude::*;
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -186,7 +186,7 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
@@ -218,24 +218,25 @@
 //! - Path exists: `path.is_some()` | `paths.contains_key()`
 //!   - Useful as a Heuristic for other Algorithms
 //!   - **100% correct** (`true` if and only if path can be found)
-//! - Total Cost of the Path: `path.cost()`
+//! - Total Cost of the Path: [`path.cost()`](internals::AbstractPath::cost)
 //!   - Correct for this Path, may be slightly larger than for optimal Path
 //!   - The cost is simply returned; `cost()` does no calculations
-//! - Total Length of the Path: `path.length()`
-//!   - Correct for this Path, may be slightly longer than for optimal Path
+//! - Total Length of the Path: [`path.length()`](internals::AbstractPath::length)
+//!   - Correct for this Path, may be slightly longer than the optimal Path
 //!   - The length is simply returned; `length()` does no calculations
-//! - Next Position: `path.next()` | `path.safe_next(cost_fn)`
+//! - Next Position: [`path.next()`](internals::AbstractPath::next) | [`path.safe_next(cost_fn)`](internals::AbstractPath::safe_next)
 //!   - [`safe_next`](internals::AbstractPath::safe_next) is needed if [`config.cache_paths`](crate::PathCacheConfig::cache_paths) is set to `false`
 //!   - can be called several times to iterate Path
 //!   - path implements `Iterator<Item = (usize, usize)>`
-//! - Entire Path: `path.resolve(cost_fn)`
+//! - Entire Path: `path.collect::<Vec<_>>()` | [`path.resolve(cost_fn)`](internals::AbstractPath::resolve)
+//!   - [`resolve`](internals::AbstractPath::resolve) is needed if [`config.cache_paths`](crate::PathCacheConfig::cache_paths) is set to `false`
 //!   - Returns a `Vec<(usize, usize)>`
 //!
 //! Note that [`resolve`](internals::AbstractPath::resolve) calculates any missing segments (if [`config.cache_paths`](crate::PathCacheConfig::cache_paths) ` == false`)
 //! and allocates a [`Vec`](std::vec::Vec) with the resulting Points. Not recommended if only the
 //! beginning of the Path is needed.
 //! ```
-//! # use hierarchical_pathfinding::{prelude::*, Point};
+//! # use hierarchical_pathfinding::prelude::*;
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -244,7 +245,7 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
@@ -292,7 +293,7 @@
 //! This means however, that the user is responsible for storing and maintaining both the Grid and the PathCache.
 //! It is also necessary to update the PathCache when the Grid has changed to keep it consistent:
 //! ```should_panic
-//! # use hierarchical_pathfinding::{prelude::*, Point};
+//! # use hierarchical_pathfinding::prelude::*;
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -301,7 +302,7 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
@@ -317,14 +318,14 @@
 //! assert!(path.is_none()); // from previous example
 //!
 //! // Clear a way to the goal
-//! grid[0][1] = 0;
+//! grid[1][2] = 0; // at (2, 1): the wall below the goal
 //!
 //! let path = pathfinding.find_path(start, goal, cost_fn(&grid));
 //! assert!(path.is_some()); // there should be a Path now!
 //! ```
 //! [`tiles_changed`](PathCache::tiles_changed) must be called with all changed Tiles:
 //! ```
-//! # use hierarchical_pathfinding::{prelude::*, Point};
+//! # use hierarchical_pathfinding::prelude::*;
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -333,7 +334,7 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
@@ -368,7 +369,7 @@
 //! The PathCacheConfig struct also provides defaults for low Memory Usage [`PathCacheConfig::LOW_MEM`]
 //! or best Performance [`PathCacheConfig::HIGH_PERFORMANCE`]
 //! ```
-//! # use hierarchical_pathfinding::{prelude::*, Point};
+//! # use hierarchical_pathfinding::prelude::*;
 //! # let mut grid = [
 //! #     [0, 2, 0, 0, 0],
 //! #     [0, 2, 2, 2, 2],
@@ -377,7 +378,7 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //!
@@ -394,11 +395,10 @@
 //! assert_eq!(pathfinding.config().chunk_size, 3);
 //! ```
 
-/// A shorthand for Points on the grid
-pub type Point = (usize, usize);
+type Point = (usize, usize);
 
-type PointMap<V> = fnv::FnvHashMap<Point, V>;
-type PointSet = fnv::FnvHashSet<Point>;
+type PointMap<V> = std::collections::HashMap<Point, V, fnv::FnvBuildHasher>;
+type PointSet = std::collections::HashSet<Point, fnv::FnvBuildHasher>;
 
 mod path_cache;
 pub use self::path_cache::{PathCache, PathCacheConfig};
@@ -415,15 +415,11 @@ mod grid;
 
 /// Internal stuff that is returned by other function
 pub mod internals {
-    pub use crate::path::{AbstractPath, Path};
+    pub use crate::path::AbstractPath;
     pub use crate::path_cache::{CacheInspector, NodeInspector};
 }
 
 /// The prelude for this crate.
-///
-/// Note: Even though most examples use the internal type-definition [`Point`]
-/// (aka `(usize, usize)`), it is not included in the prelude since most users probably have
-/// another implementation with the same name in scope.
 pub mod prelude {
     pub use crate::{
         neighbors::{ManhattanNeighborhood, MooreNeighborhood, Neighborhood},

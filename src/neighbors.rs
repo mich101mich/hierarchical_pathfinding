@@ -28,6 +28,9 @@ pub trait Neighborhood: Clone + Debug {
 	///
 	/// This is usually the Distance between the two Points in the Metric of your Neighborhood.
 	///
+	/// The returned value _**must be**_ less than or equal to the real cost of walking from
+	/// `point` to `goal`. See [A*](https://en.wikipedia.org/wiki/A*_search_algorithm) for details.
+	///
 	/// If there is no proper way of calculation how long it takes, simply return 0. This will
 	/// increase the time it takes to calculate the Path, but at least it will always be correct.
 	fn heuristic(&self, point: Point, goal: Point) -> usize;
@@ -154,32 +157,42 @@ impl Neighborhood for MooreNeighborhood {
 	}
 }
 
-#[test]
-fn test_manhattan_get_all_neighbors() {
-	let neighborhood = ManhattanNeighborhood::new(5, 5);
-	assert_eq!(
-		neighborhood.get_all_neighbors((0, 2)).collect::<Vec<_>>(),
-		vec![(0, 1), (1, 2), (0, 3)],
-	);
-}
+#[cfg(test)]
+mod tests {
+	use super::*;
+	mod manhattan {
+		use super::*;
+		#[test]
+		fn get_all_neighbors() {
+			let neighborhood = ManhattanNeighborhood::new(5, 5);
+			assert_eq!(
+				neighborhood.get_all_neighbors((0, 2)).collect::<Vec<_>>(),
+				vec![(0, 1), (1, 2), (0, 3)],
+			);
+		}
 
-#[test]
-fn test_manhattan_heuristic() {
-	let neighborhood = ManhattanNeighborhood::new(5, 5);
-	assert_eq!(neighborhood.heuristic((3, 1), (0, 0)), 3 + 1);
-}
+		#[test]
+		fn heuristic() {
+			let neighborhood = ManhattanNeighborhood::new(5, 5);
+			assert_eq!(neighborhood.heuristic((3, 1), (0, 0)), 3 + 1);
+		}
+	}
+	mod moore {
+		use super::*;
 
-#[test]
-fn test_moore_get_all_neighbors() {
-	let neighborhood = MooreNeighborhood::new(5, 5);
-	assert_eq!(
-		neighborhood.get_all_neighbors((0, 2)).collect::<Vec<_>>(),
-		vec![(0, 1), (1, 1), (1, 2), (1, 3), (0, 3)],
-	);
-}
+		#[test]
+		fn get_all_neighbors() {
+			let neighborhood = MooreNeighborhood::new(5, 5);
+			assert_eq!(
+				neighborhood.get_all_neighbors((0, 2)).collect::<Vec<_>>(),
+				vec![(0, 1), (1, 1), (1, 2), (1, 3), (0, 3)],
+			);
+		}
 
-#[test]
-fn test_moore_heuristic() {
-	let neighborhood = MooreNeighborhood::new(5, 5);
-	assert_eq!(neighborhood.heuristic((3, 1), (0, 0)), 3);
+		#[test]
+		fn heuristic() {
+			let neighborhood = MooreNeighborhood::new(5, 5);
+			assert_eq!(neighborhood.heuristic((3, 1), (0, 0)), 3);
+		}
+	}
 }

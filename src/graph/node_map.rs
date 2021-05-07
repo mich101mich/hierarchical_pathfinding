@@ -21,7 +21,7 @@ impl NodeMap {
 		}
 	}
 
-	pub fn add_node(&mut self, pos: Point, walk_cost: isize) -> NodeID {
+	pub fn add_node(&mut self, pos: Point, walk_cost: usize) -> NodeID {
 		while self.next_id < self.nodes.len() && self.nodes[self.next_id].is_some() {
 			self.next_id += 1;
 		}
@@ -38,31 +38,14 @@ impl NodeMap {
 	}
 
 	pub fn add_edge(&mut self, src: NodeID, target: NodeID, path: PathSegment) {
-		let (src_pos, src_cost) = {
-			let node = &self[src];
-			(node.pos, node.walk_cost)
-		};
-		assert!(src_cost >= 0, "Cannot add Path from solid Node");
+		let src_cost = self[src].walk_cost;
 
 		let target_node = &mut self[target];
 
-		let target_pos = target_node.pos;
 		let target_cost = target_node.walk_cost;
 
-		if target_cost >= 0 {
-			let other_path = path.reversed(src_cost as usize, target_cost as usize);
-			target_node.edges.insert(src, other_path);
-		} else {
-			target_node.edges.insert(
-				src,
-				PathSegment::Unknown {
-					start: src_pos,
-					end: target_pos,
-					cost: std::usize::MAX,
-					len: std::usize::MAX,
-				},
-			);
-		}
+		let other_path = path.reversed(src_cost, target_cost);
+		target_node.edges.insert(src, other_path);
 
 		let src_node = &mut self[src];
 		src_node.edges.insert(target, path);

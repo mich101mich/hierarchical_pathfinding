@@ -9,6 +9,7 @@ pub fn dijkstra_search<GetNeighbors, NeighborIter, GetCost>(
 	mut get_cost: GetCost,
 	start: Point,
 	goals: &[Point],
+	only_closest_goal: bool,
 ) -> PointMap<Path<Point>>
 where
 	GetNeighbors: FnMut(Point) -> NeighborIter,
@@ -33,7 +34,7 @@ where
 
 		if remaining_goals.remove(&current_id) {
 			goal_costs.insert(current_id, current_cost);
-			if remaining_goals.is_empty() {
+			if only_closest_goal || remaining_goals.is_empty() {
 				break;
 			}
 		}
@@ -89,42 +90,48 @@ where
 	goal_data
 }
 
-#[test]
-fn grid_dijkstra() {
-	use crate::prelude::*;
+#[cfg(test)]
+mod tests {
+	use super::*;
 
-	// create and initialize Grid
-	// 0 = empty, 1 = swamp, 2 = wall
-	let grid = [
-		[0, 2, 0, 0, 0],
-		[0, 2, 2, 2, 2],
-		[0, 1, 0, 0, 0],
-		[0, 1, 0, 2, 0],
-		[0, 0, 0, 2, 0],
-	];
-	let (width, height) = (grid.len(), grid[0].len());
+	#[test]
+	fn basic() {
+		use crate::prelude::*;
 
-	let neighborhood = ManhattanNeighborhood::new(width, height);
+		// create and initialize Grid
+		// 0 = empty, 1 = swamp, 2 = wall
+		let grid = [
+			[0, 2, 0, 0, 0],
+			[0, 2, 2, 2, 2],
+			[0, 1, 0, 0, 0],
+			[0, 1, 0, 2, 0],
+			[0, 0, 0, 2, 0],
+		];
+		let (width, height) = (grid.len(), grid[0].len());
 
-	const COST_MAP: [isize; 3] = [1, 10, -1];
+		let neighborhood = ManhattanNeighborhood::new(width, height);
 
-	fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
-		move |(x, y)| COST_MAP[grid[y][x]]
+		const COST_MAP: [isize; 3] = [1, 10, -1];
+
+		fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut(Point) -> isize {
+			move |(x, y)| COST_MAP[grid[y][x]]
+		}
+
+		let start = (0, 0);
+		let goals = [(4, 4), (2, 0)];
+
+		let paths = dijkstra_search(
+			|point| neighborhood.get_all_neighbors(point),
+			cost_fn(&grid),
+			start,
+			&goals,
+			false,
+		);
+
+		// (4, 4) is reachable
+		assert!(paths.contains_key(&goals[0]));
+
+		// (2, 0) is not reachable
+		assert!(!paths.contains_key(&goals[1]));
 	}
-
-	let start = (0, 0);
-	let goals = [(4, 4), (2, 0)];
-
-	let paths = dijkstra_search(
-		|point| neighborhood.get_all_neighbors(point),
-		cost_fn(&grid),
-		start,
-		&goals,
-	);
-
-	// (4, 4) is reachable
-	assert!(paths.contains_key(&goals[0]));
-
-	// (2, 0) is not reachable
-	assert!(!paths.contains_key(&goals[1]));
 }

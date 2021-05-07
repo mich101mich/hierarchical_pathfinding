@@ -1,5 +1,5 @@
 use crate::{
-	graph::{self, Node, NodeID, NodeMap},
+	graph::{self, Node, NodeID, NodeIDMap, NodeMap},
 	neighbors::Neighborhood,
 	path::{AbstractPath, Cost, Path, PathSegment},
 	*,
@@ -39,14 +39,17 @@ impl<N: Neighborhood> PathCache<N> {
 	///
 	/// ## Arguments
 	/// - `(width, height)` - the size of the Grid
-	/// - `get_cost` - get the cost for walking over a Tile. (Cost < 0 => solid Tile)
+	/// - `get_cost` - get the cost for walking over a Tile. (Cost < 0 means solid Tile)
 	/// - `neighborhood` - the Neighborhood to use. (See [`Neighborhood`])
 	/// - `config` - optional config for creating the cache. (See [`PathCacheConfig`])
+	///
+	/// `get_cost((x, y))` should return the cost for walking over the Tile at (x, y).
+	/// Costs below 0 are solid Tiles.
 	///
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// use hierarchical_pathfinding::{prelude::*, Point};
+	/// use hierarchical_pathfinding::prelude::*;
 	///
 	/// // create and initialize Grid
 	/// // 0 = empty, 1 = swamp, 2 = wall
@@ -62,7 +65,7 @@ impl<N: Neighborhood> PathCache<N> {
 	///
 	/// const COST_MAP: [isize; 3] = [1, 10, -1];
 	///
-	/// fn cost_fn(grid: &Grid) -> impl '_ + FnMut(Point) -> isize {
+	/// fn cost_fn(grid: &Grid) -> impl '_ + FnMut((usize, usize)) -> isize {
 	///     move |(x, y)| COST_MAP[grid[y][x]]
 	/// }
 	///
@@ -146,23 +149,13 @@ impl<N: Neighborhood> PathCache<N> {
 	///
 	/// If no Path could be found, `None` is returned.
 	///
-	/// This function takes a mutable reference of self, because `start` and `goal` need to be
-	/// inserted into the Abstract Graph in order for the algorithm to work. They are removed at
-	/// the end unless [`config.keep_insertions`](PathCacheConfig::keep_insertions) was set to
-	/// `true` (default) when creating the PathCache.
-	///
-	/// ## Arguments
-	/// - `start`  the Point where the search starts
-	/// - `goal`  the Point to search for. This may be a solid Tile.
-	/// - `get_cost`  get the cost for walking over a Tile. (Cost < 0 => solid Tile)
+	/// `get_cost((x, y))` should return the cost for walking over the Tile at (x, y).
+	/// Costs below 0 are solid Tiles.
 	///
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// # use hierarchical_pathfinding::{prelude::*, Point};
-	/// #
-	/// # // create and initialize Grid
-	/// # // 0 = empty, 1 = swamp, 2 = wall
+	/// # use hierarchical_pathfinding::prelude::*;
 	/// # let mut grid = [
 	/// #     [0, 2, 0, 0, 0],
 	/// #     [0, 2, 2, 2, 2],
@@ -171,20 +164,17 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #     [0, 0, 0, 2, 0],
 	/// # ];
 	/// # let (width, height) = (grid.len(), grid[0].len());
-	/// #
-	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
-	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-	/// #     move |(x, y)| COST_MAP[grid[y][x]]
+	/// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+	/// #     move |(x, y)| [1, 10, -1][grid[y][x]]
 	/// # }
-	/// #
-	/// # let mut pathfinding = PathCache::new(
+	/// let pathfinding: PathCache<_> = // ...
+	/// # PathCache::new(
 	/// #     (width, height),
 	/// #     cost_fn(&grid),
 	/// #     ManhattanNeighborhood::new(width, height),
 	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 	/// # );
-	/// #
+	///
 	/// let start = (0, 0);
 	/// let goal = (4, 4);
 	///
@@ -211,10 +201,7 @@ impl<N: Neighborhood> PathCache<N> {
 	///
 	/// Using the Path:
 	/// ```
-	/// # use hierarchical_pathfinding::{prelude::*, Point};
-	/// #
-	/// # // create and initialize Grid
-	/// # // 0 = empty, 1 = swamp, 2 = wall
+	/// # use hierarchical_pathfinding::prelude::*;
 	/// # let mut grid = [
 	/// #     [0, 2, 0, 0, 0],
 	/// #     [0, 2, 2, 2, 2],
@@ -223,14 +210,10 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #     [0, 0, 0, 2, 0],
 	/// # ];
 	/// # let (width, height) = (grid.len(), grid[0].len());
-	/// #
-	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
-	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-	/// #     move |(x, y)| COST_MAP[grid[y][x]]
+	/// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+	/// #     move |(x, y)| [1, 10, -1][grid[y][x]]
 	/// # }
-	/// #
-	/// # let mut pathfinding = PathCache::new(
+	/// # let pathfinding = PathCache::new(
 	/// #     (width, height),
 	/// #     cost_fn(&grid),
 	/// #     ManhattanNeighborhood::new(width, height),
@@ -269,10 +252,7 @@ impl<N: Neighborhood> PathCache<N> {
 	///
 	/// Obtaining the entire Path:
 	/// ```
-	/// # use hierarchical_pathfinding::{prelude::*, Point};
-	/// #
-	/// # // create and initialize Grid
-	/// # // 0 = empty, 1 = swamp, 2 = wall
+	/// # use hierarchical_pathfinding::prelude::*;
 	/// # let mut grid = [
 	/// #     [0, 2, 0, 0, 0],
 	/// #     [0, 2, 2, 2, 2],
@@ -281,34 +261,19 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #     [0, 0, 0, 2, 0],
 	/// # ];
 	/// # let (width, height) = (grid.len(), grid[0].len());
-	/// #
-	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
-	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-	/// #     move |(x, y)| COST_MAP[grid[y][x]]
+	/// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+	/// #     move |(x, y)| [1, 10, -1][grid[y][x]]
 	/// # }
-	/// #
-	/// # let mut pathfinding = PathCache::new(
+	/// # let pathfinding = PathCache::new(
 	/// #     (width, height),
 	/// #     cost_fn(&grid),
 	/// #     ManhattanNeighborhood::new(width, height),
 	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 	/// # );
-	/// # struct Player{ pos: (usize, usize) }
-	/// # impl Player {
-	/// #     pub fn move_to(&mut self, pos: (usize, usize)) {
-	/// #         self.pos = pos;
-	/// #     }
-	/// # }
-	/// #
-	/// # let mut player = Player {
-	/// #     pos: (0, 0),
-	/// #     //...
-	/// # };
+	/// # let start = (0, 0);
 	/// # let goal = (4, 4);
-	/// #
 	/// # let path = pathfinding.find_path(
-	/// #     player.pos,
+	/// #     start,
 	/// #     goal,
 	/// #     cost_fn(&grid),
 	/// # );
@@ -323,98 +288,63 @@ impl<N: Neighborhood> PathCache<N> {
 	/// );
 	/// ```
 	pub fn find_path(
-		&mut self,
+		&self,
 		start: Point,
 		goal: Point,
 		mut get_cost: impl FnMut(Point) -> isize,
 	) -> Option<AbstractPath<N>> {
 		if get_cost(start) < 0 {
-			panic!(
-				"tried to call find_path with {:?} as start, but it is solid",
-				start
-			);
-		}
-
-		if start == goal {
-			return Some(AbstractPath::from_known_path(
-				self.neighborhood.clone(),
-				Path::from_slice(&[start, start], 0),
-			));
+			// cannot start on a wall
+			return None;
 		}
 
 		let neighborhood = self.neighborhood.clone();
 
-		let (start_id, start_path, inserted_start) =
-			self.find_or_insert_node(start, &mut get_cost, |p| neighborhood.heuristic(p, goal));
-
-		let (goal_id, goal_path, inserted_goal) =
-			self.find_or_insert_node(goal, &mut get_cost, |p| neighborhood.heuristic(start, p));
-
-		// start != goal, but latched onto the same neighbor
-		if start_id == goal_id {
-			// if both start_path and goal_path are Some, then it is a 3-step path
-			let path = if let Some(middle) = start_path.and(goal_path) {
-				Path::from_slice(&[start, middle, goal], 0)
-			} else {
-				// if either is None, then that point must be on the Node that the other is next to
-				Path::from_slice(&[start, goal], 0)
-			};
-
-			if !self.config.keep_insertions {
-				if inserted_start {
-					self.nodes.remove_node(start_id);
-				}
-				if inserted_goal {
-					self.nodes.remove_node(goal_id);
-				}
-			}
-
+		if start == goal {
 			return Some(AbstractPath::from_known_path(
-				self.neighborhood.clone(),
-				path,
+				neighborhood,
+				Path::from_slice(&[start, start], 0),
 			));
 		}
 
-		let path = graph::a_star_search(&self.nodes, start_id, goal_id, &self.neighborhood);
-
-		let final_path = if let Some(path) = path {
-			let length: usize = path
-				.iter()
-				.zip(path.iter().skip(1))
-				.map(|(a, b)| self.nodes[*a].edges[&b].len())
-				.sum();
-
-			if self.config.a_star_fallback && length < 2 * self.config.chunk_size {
-				let path = grid::a_star_search(
-					|p| self.neighborhood.get_all_neighbors(p),
-					get_cost,
-					start,
-					goal,
-					|p| self.neighborhood.heuristic(p, goal),
-				)
-				.expect("Internal Error #1 in PathCache. Please report this");
-
-				Some(AbstractPath::<N>::from_known_path(
-					self.neighborhood.clone(),
-					path,
-				))
+		let (start_id, start_path) =
+			if let Some(s) = self.find_nearest_node(start, &mut get_cost, false) {
+				s
 			} else {
-				Some(self.resolve_path(&path, start, start_path, goal, goal_path, &mut get_cost))
-			}
-		} else {
-			None
-		};
+				// no path from start to any Node => start is in cave within chunk
+				// => hope that goal is in the same cave
+				return self
+					.get_chunk(start)
+					.find_path(start, goal, get_cost, &neighborhood)
+					.map(|path| AbstractPath::from_known_path(neighborhood, path));
+			};
 
-		if !self.config.keep_insertions {
-			if inserted_start {
-				self.nodes.remove_node(start_id);
-			}
-			if inserted_goal {
-				self.nodes.remove_node(goal_id);
-			}
+		// try-operator: see above, but we know that start is not in a cave
+		let (goal_id, goal_path) = self.find_nearest_node(goal, &mut get_cost, true)?;
+
+		let path = graph::a_star_search(&self.nodes, start_id, goal_id, &neighborhood)?;
+
+		if path.len() == 2 || (self.config.a_star_fallback && path.len() <= 4) {
+			// 2: start_id == goal_id
+			// <= 4: start_id X X goal_id
+			return self
+				.grid_a_star(start, goal, get_cost)
+				.map(|path| AbstractPath::from_known_path(neighborhood, path));
 		}
 
-		final_path
+		let mut paths = NodeIDMap::default();
+		paths.insert(goal_id, path);
+
+		self.resolve_paths(
+			start,
+			start_path,
+			&[(goal, goal_id, goal_path)],
+			&paths,
+			get_cost,
+		)
+		.into_iter()
+		.next()
+		.map(|(_, path)| path)
 	}
 
 	/// Calculates the Paths from one `start` to several `goals` on the Grid.
@@ -426,20 +356,15 @@ impl<N: Neighborhood> PathCache<N> {
 	/// Instead of returning a single Option, it returns a Hashmap, where the position of the Goal
 	/// is the key, and the Value is a Tuple of the Path and the Cost of that Path.
 	///
-	/// See [`find_path`](PathCache::find_path) for more details on how to use the returned Path.
+	/// `get_cost((x, y))` should return the cost for walking over the Tile at (x, y).
+	/// Costs below 0 are solid Tiles.
 	///
-	/// ## Arguments
-	/// - `start`  the Point where the search starts
-	/// - `goals`  the Points to search for. They may be a solid Tiles.
-	/// - `get_cost`  get the cost for walking over a Tile. (Cost < 0 => solid Tile)
+	/// See [`find_path`](PathCache::find_path) for more details on how to use the returned Paths.
 	///
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// # use hierarchical_pathfinding::{prelude::*, Point};
-	/// #
-	/// # // create and initialize Grid
-	/// # // 0 = empty, 1 = swamp, 2 = wall
+	/// # use hierarchical_pathfinding::prelude::*;
 	/// # let mut grid = [
 	/// #     [0, 2, 0, 0, 0],
 	/// #     [0, 2, 2, 2, 2],
@@ -448,20 +373,17 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #     [0, 0, 0, 2, 0],
 	/// # ];
 	/// # let (width, height) = (grid.len(), grid[0].len());
-	/// #
-	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
-	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-	/// #     move |(x, y)| COST_MAP[grid[y][x]]
+	/// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+	/// #     move |(x, y)| [1, 10, -1][grid[y][x]]
 	/// # }
-	/// #
-	/// # let mut pathfinding = PathCache::new(
+	/// let pathfinding: PathCache<_> = // ...
+	/// # PathCache::new(
 	/// #     (width, height),
 	/// #     cost_fn(&grid),
 	/// #     ManhattanNeighborhood::new(width, height),
 	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 	/// # );
-	/// #
+	///
 	/// let start = (0, 0);
 	/// let goals = [(4, 4), (2, 0)];
 	///
@@ -481,10 +403,7 @@ impl<N: Neighborhood> PathCache<N> {
 	///
 	/// The returned Path is always equivalent to the one returned by [`find_path`](PathCache::find_path):
 	/// ```
-	/// # use hierarchical_pathfinding::{prelude::*, Point};
-	/// #
-	/// # // create and initialize Grid
-	/// # // 0 = empty, 1 = swamp, 2 = wall
+	/// # use hierarchical_pathfinding::prelude::*;
 	/// # let mut grid = [
 	/// #     [0, 2, 0, 0, 0],
 	/// #     [0, 2, 2, 2, 2],
@@ -493,20 +412,15 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #     [0, 0, 0, 2, 0],
 	/// # ];
 	/// # let (width, height) = (grid.len(), grid[0].len());
-	/// #
-	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
-	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-	/// #     move |(x, y)| COST_MAP[grid[y][x]]
+	/// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+	/// #     move |(x, y)| [1, 10, -1][grid[y][x]]
 	/// # }
-	/// #
-	/// # let mut pathfinding = PathCache::new(
+	/// # let pathfinding = PathCache::new(
 	/// #     (width, height),
 	/// #     cost_fn(&grid),
 	/// #     ManhattanNeighborhood::new(width, height),
 	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 	/// # );
-	/// #
 	/// let start = (0, 0);
 	/// let goal = (4, 4);
 	///
@@ -515,9 +429,9 @@ impl<N: Neighborhood> PathCache<N> {
 	///     &[goal],
 	///     cost_fn(&grid),
 	/// );
-	/// let dijkstra_path: Vec<Point> = paths[&goal].clone().collect();
+	/// let dijkstra_path: Vec<_> = paths[&goal].clone().collect();
 	///
-	/// let a_star_path: Vec<Point> = pathfinding.find_path(
+	/// let a_star_path: Vec<_> = pathfinding.find_path(
 	///     start,
 	///     goal,
 	///     cost_fn(&grid),
@@ -526,48 +440,167 @@ impl<N: Neighborhood> PathCache<N> {
 	/// assert_eq!(dijkstra_path, a_star_path);
 	/// ```
 	pub fn find_paths(
-		&mut self,
+		&self,
+		start: Point,
+		goals: &[Point],
+		get_cost: impl FnMut(Point) -> isize,
+	) -> PointMap<AbstractPath<N>> {
+		self.find_paths_internal(start, goals, get_cost, false)
+	}
+
+	/// Finds the closest from a list of goals.
+	///
+	/// Returns a tuple of the goal and the Path to that goal, or `None` if none of the goals are
+	/// reachable.
+	///
+	/// Similar to [`find_paths`](PathCache::find_paths) in performance and search strategy, but
+	/// stops after the first goal is found.
+	///
+	/// ## Examples
+	/// Basic usage:
+	/// ```
+	/// # use hierarchical_pathfinding::prelude::*;
+	/// # let mut grid = [
+	/// #     [0, 2, 0, 0, 0],
+	/// #     [0, 2, 2, 2, 2],
+	/// #     [0, 1, 0, 0, 0],
+	/// #     [0, 1, 0, 2, 0],
+	/// #     [0, 0, 0, 2, 0],
+	/// # ];
+	/// # let (width, height) = (grid.len(), grid[0].len());
+	/// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+	/// #     move |(x, y)| [1, 10, -1][grid[y][x]]
+	/// # }
+	/// let pathfinding: PathCache<_> = // ...
+	/// # PathCache::new(
+	/// #     (width, height),
+	/// #     cost_fn(&grid),
+	/// #     ManhattanNeighborhood::new(width, height),
+	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+	/// # );
+	///
+	/// let start = (0, 0);
+	/// let goals = [(4, 4), (2, 0), (2, 2)];
+	///
+	/// // find_closest_goal returns Some((goal, Path)) on success
+	/// let (goal, path) = pathfinding.find_closest_goal(
+	///     start,
+	///     &goals,
+	///     cost_fn(&grid),
+	/// ).unwrap();
+	///
+	/// assert_eq!(goal, goals[2]);
+	///
+	/// let naive_closest = pathfinding
+	///     .find_paths(start, &goals, cost_fn(&grid))
+	///     .into_iter()
+	///     .min_by_key(|(_, path)| path.cost())
+	///     .unwrap();
+	///
+	/// assert_eq!(goal, naive_closest.0);
+	///
+	/// let path: Vec<_> = path.collect();
+	/// let naive_path: Vec<_> = naive_closest.1.collect();
+	/// assert_eq!(path, naive_path);
+	/// ```
+	/// Comparison with [`find_paths`](PathCache::find_paths):
+	/// ```
+	/// # use hierarchical_pathfinding::prelude::*;
+	/// # let mut grid = [
+	/// #     [0, 2, 0, 0, 0],
+	/// #     [0, 2, 2, 2, 2],
+	/// #     [0, 1, 0, 0, 0],
+	/// #     [0, 1, 0, 2, 0],
+	/// #     [0, 0, 0, 2, 0],
+	/// # ];
+	/// # let (width, height) = (grid.len(), grid[0].len());
+	/// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+	/// #     move |(x, y)| [1, 10, -1][grid[y][x]]
+	/// # }
+	/// # let pathfinding = PathCache::new(
+	/// #     (width, height),
+	/// #     cost_fn(&grid),
+	/// #     ManhattanNeighborhood::new(width, height),
+	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+	/// # );
+	/// # let start = (0, 0);
+	/// # let goals = [(4, 4), (2, 0), (2, 2)];
+	/// let (goal, path) = pathfinding.find_closest_goal(
+	///     start,
+	///     &goals,
+	///     cost_fn(&grid),
+	/// ).unwrap();
+	///
+	/// let naive_closest = pathfinding
+	///     .find_paths(start, &goals, cost_fn(&grid))
+	///     .into_iter()
+	///     .min_by_key(|(_, path)| path.cost())
+	///     .unwrap();
+	///
+	/// assert_eq!(goal, naive_closest.0);
+	///
+	/// let path: Vec<_> = path.collect();
+	/// let naive_path: Vec<_> = naive_closest.1.collect();
+	/// assert_eq!(path, naive_path);
+	/// ```
+	pub fn find_closest_goal(
+		&self,
+		start: Point,
+		goals: &[Point],
+		get_cost: impl FnMut(Point) -> isize,
+	) -> Option<(Point, AbstractPath<N>)> {
+		self.find_paths_internal(start, goals, get_cost, true)
+			.into_iter()
+			.next()
+	}
+
+	fn find_paths_internal(
+		&self,
 		start: Point,
 		goals: &[Point],
 		mut get_cost: impl FnMut(Point) -> isize,
+		only_closest_goal: bool,
 	) -> PointMap<AbstractPath<N>> {
-		if get_cost(start) < 0 {
-			panic!(
-				"tried to call find_path with {:?} as start, but it is solid",
-				start
-			);
-		}
-
-		if goals.is_empty() {
+		if get_cost(start) < 0 || goals.is_empty() {
 			return PointMap::default();
 		}
 
-		let goals: PointSet = goals.iter().copied().collect();
-
 		if goals.len() == 1 {
-			let goal = *goals.iter().next().unwrap();
-			if let Some(path) = self.find_path(start, goal, get_cost) {
-				let mut ret = PointMap::default();
-				ret.insert(goal, path);
-				return ret;
-			} else {
-				return PointMap::default();
-			}
+			let goal = goals[0];
+			return self
+				.find_path(start, goal, get_cost)
+				.map(|path| (goal, path))
+				.into_iter()
+				.collect();
 		}
 
 		let neighborhood = self.neighborhood.clone();
 
-		let (start_id, start_path, inserted_start) =
-			self.find_or_insert_node(start, &mut get_cost, |_| 0);
+		let (start_id, start_path) =
+			if let Some(s) = self.find_nearest_node(start, &mut get_cost, false) {
+				s
+			} else {
+				// no path from start to any Node => start is in cave within chunk
+				// => find all goals in the same cave
+				return self
+					.get_chunk(start)
+					.find_paths(start, goals, get_cost, &neighborhood)
+					.into_iter()
+					.map(|(goal, path)| {
+						(
+							goal,
+							AbstractPath::from_known_path(neighborhood.clone(), path),
+						)
+					})
+					.collect();
+			};
 
-		let mut goal_pos = Vec::with_capacity(goals.len());
+		let mut goal_data = Vec::with_capacity(goals.len());
 		let mut goal_ids = Vec::with_capacity(goals.len());
-		let mut goal_paths = Vec::with_capacity(goals.len());
-		let mut inserted_goals = Vec::with_capacity(goals.len());
 
 		let mut ret = PointMap::default();
 
-		for goal in goals.into_iter() {
+		for goal in goals.iter().copied() {
 			if goal == start {
 				let path = AbstractPath::from_known_path(
 					self.neighborhood.clone(),
@@ -577,50 +610,20 @@ impl<N: Neighborhood> PathCache<N> {
 				continue;
 			}
 
-			let (goal_id, goal_path, inserted_goal) =
-				self.find_or_insert_node(goal, &mut get_cost, |p| neighborhood.heuristic(start, p));
-
-			// see the same condition in find_path
-			if start_id == goal_id {
-				let path = if let Some(middle) = start_path.and(goal_path) {
-					Path::from_slice(&[start, middle, goal], 0)
+			let (goal_id, goal_path) =
+				if let Some(g) = self.find_nearest_node(goal, &mut get_cost, true) {
+					g
 				} else {
-					Path::from_slice(&[start, goal], 0)
+					continue;
 				};
 
-				let path = AbstractPath::from_known_path(self.neighborhood.clone(), path);
-				ret.insert(goal, path);
-				continue;
-			}
-
-			goal_pos.push(goal);
+			goal_data.push((goal, goal_id, goal_path));
 			goal_ids.push(goal_id);
-			goal_paths.push(goal_path);
-			inserted_goals.push(inserted_goal);
 		}
 
-		let paths = graph::dijkstra_search(&self.nodes, start_id, &goal_ids);
+		let paths = graph::dijkstra_search(&self.nodes, start_id, &goal_ids, only_closest_goal);
 
-		for ((id, goal), goal_path) in goal_ids.iter().zip(goal_pos).zip(goal_paths) {
-			if let Some(path) = paths.get(id) {
-				let path =
-					self.resolve_path(path, start, start_path, goal, goal_path, &mut get_cost);
-				ret.insert(goal, path);
-			}
-		}
-
-		if !self.config.keep_insertions {
-			if inserted_start {
-				self.nodes.remove_node(start_id);
-			}
-			for (goal_id, inserted_goal) in goal_ids.iter().zip(inserted_goals) {
-				if inserted_goal {
-					self.nodes.remove_node(*goal_id);
-				}
-			}
-		}
-
-		ret
+		self.resolve_paths(start, start_path, &goal_data, &paths, get_cost)
 	}
 
 	/// Notifies the PathCache that the Grid changed.
@@ -636,10 +639,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// # use hierarchical_pathfinding::{prelude::*, Point};
-	/// #
-	/// # // create and initialize Grid
-	/// # // 0 = empty, 1 = swamp, 2 = wall
+	/// # use hierarchical_pathfinding::prelude::*;
 	/// # let mut grid = [
 	/// #     [0, 2, 0, 0, 0],
 	/// #     [0, 2, 2, 2, 2],
@@ -648,20 +648,17 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #     [0, 0, 0, 2, 0],
 	/// # ];
 	/// # let (width, height) = (grid.len(), grid[0].len());
-	/// #
-	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
-	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-	/// #     move |(x, y)| COST_MAP[grid[y][x]]
+	/// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+	/// #     move |(x, y)| [1, 10, -1][grid[y][x]]
 	/// # }
-	/// #
-	/// # let mut pathfinding = PathCache::new(
+	/// let mut pathfinding: PathCache<_> = // ...
+	/// # PathCache::new(
 	/// #     (width, height),
 	/// #     cost_fn(&grid),
 	/// #     ManhattanNeighborhood::new(width, height),
 	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 	/// # );
-	/// #
+	///
 	/// let (start, goal) = ((0, 0), (2, 0));
 	///
 	/// let path = pathfinding.find_path(start, goal, cost_fn(&grid));
@@ -707,7 +704,7 @@ impl<N: Neighborhood> PathCache<N> {
 		let mut renew = PointMap::default();
 
 		for (&cp, positions) in dirty.iter() {
-			let chunk = get_chunk!(self, cp);
+			let chunk = self.get_chunk(cp);
 			// for every changed tile in the chunk
 			for &p in positions {
 				// check every side that this tile is on
@@ -765,7 +762,7 @@ impl<N: Neighborhood> PathCache<N> {
 		// remove all nodes of sides in renew
 		for (&cp, sides) in renew.iter() {
 			let removed = {
-				let chunk = get_chunk!(self, cp);
+				let chunk = self.get_chunk(cp);
 				chunk
 					.nodes
 					.iter()
@@ -826,7 +823,7 @@ impl<N: Neighborhood> PathCache<N> {
 			let all_nodes = &mut self.nodes;
 			let nodes = candidates
 				.into_iter()
-				.map(|p| all_nodes.add_node(p, get_cost(p)))
+				.map(|p| all_nodes.add_node(p, get_cost(p) as usize))
 				.to_vec();
 
 			if !dirty.contains_key(&cp) {
@@ -871,11 +868,7 @@ impl<N: Neighborhood> PathCache<N> {
 	/// ## Examples
 	/// Basic usage:
 	/// ```
-	/// # use hierarchical_pathfinding::{prelude::*, Point};
-	/// # use std::collections::HashSet;
-	/// #
-	/// # // create and initialize Grid
-	/// # // 0 = empty, 1 = swamp, 2 = wall
+	/// # use hierarchical_pathfinding::prelude::*;
 	/// # let mut grid = [
 	/// #     [0, 2, 0, 0, 0],
 	/// #     [0, 2, 2, 2, 2],
@@ -884,23 +877,19 @@ impl<N: Neighborhood> PathCache<N> {
 	/// #     [0, 0, 0, 2, 0],
 	/// # ];
 	/// # let (width, height) = (grid.len(), grid[0].len());
-	/// #
-	/// # const COST_MAP: [isize; 3] = [1, 10, -1];
-	/// #
-	/// # fn cost_fn<'a>(grid: &'a [[usize; 5]; 5]) -> impl 'a + FnMut(Point) -> isize {
-	/// #     move |(x, y)| COST_MAP[grid[y][x]]
+	/// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+	/// #     move |(x, y)| [1, 10, -1][grid[y][x]]
 	/// # }
-	/// #
-	/// # let mut pathfinding = PathCache::new(
+	/// let pathfinding: PathCache<_> = // ...
+	/// # PathCache::new(
 	/// #     (width, height),
 	/// #     cost_fn(&grid),
 	/// #     ManhattanNeighborhood::new(width, height),
 	/// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
 	/// # );
-	/// #
-	/// // create PathCache
 	///
 	/// // only draw the connections between Nodes once
+	/// # use std::collections::HashSet;
 	/// let mut visited = HashSet::new();
 	///
 	/// for node in pathfinding.inspect_nodes() {
@@ -919,6 +908,7 @@ impl<N: Neighborhood> PathCache<N> {
 		CacheInspector::new(self)
 	}
 
+	/// Prints all Nodes
 	#[allow(dead_code)]
 	fn print_nodes(&self) {
 		for node in self.inspect_nodes() {
@@ -932,188 +922,125 @@ impl<N: Neighborhood> PathCache<N> {
 		}
 	}
 
-	#[allow(dead_code)]
 	fn get_chunk_pos(&self, point: Point) -> Point {
 		let size = self.config.chunk_size;
 		((point.0 / size) * size, (point.1 / size) * size)
 	}
 
-	#[allow(dead_code)]
+	fn get_chunk(&self, point: Point) -> &Chunk {
+		get_chunk!(self, point)
+	}
+
+	fn same_chunk(&self, a: Point, b: Point) -> bool {
+		let size = self.config.chunk_size;
+		a.0 / size == b.0 / size && a.1 / size == b.1 / size
+	}
+
 	fn get_node_id(&self, pos: Point) -> Option<NodeID> {
 		self.nodes.id_at(pos)
 	}
 
 	/// Returns the config used to create this PathCache
-	pub fn config(&self) -> PathCacheConfig {
-		self.config
+	pub fn config(&self) -> &PathCacheConfig {
+		&self.config
 	}
 
-	fn find_or_insert_node(
-		&mut self,
-		pos: Point,
-		mut get_cost: impl FnMut(Point) -> isize,
-		mut criterion: impl FnMut(Point) -> usize,
-	) -> (NodeID, Option<Point>, bool) {
-		self.get_node_id(pos)
-			.map(|id| (id, None, false))
-			.or_else(|| {
-				// check if a neighboring tile has a Node, but not for walls
-				if !self.config.use_nearby_nodes_for_search
-					|| self.config.perfect_paths
-					|| get_cost(pos) < 0
-				{
-					None
-				} else {
-					self.neighborhood
-						.get_all_neighbors(pos)
-						.filter(|p| get_cost(*p) >= 0)
-						.filter_map(|p| self.get_node_id(p).map(|id| (p, id)))
-						.min_by_key(|(p, _)| criterion(*p))
-						.map(|(p, id)| (id, Some(p), false))
-				}
-			})
-			.unwrap_or_else(|| {
-				let node = self.add_node(pos, &mut get_cost);
-				if get_cost(pos) < 0 && !self.nodes.values().any(|n| n.edges.contains_key(&node)) {
-					for dir in Dir::all() {
-						if let Some(p) = get_in_dir(pos, dir, (0, 0), (self.width, self.height)) {
-							if get_cost(p) >= 0 && self.get_node_id(p).is_none() {
-								self.add_node(p, &mut get_cost);
-							}
-						}
-					}
-				}
-				(node, None, true)
-			})
-	}
-
-	fn resolve_path(
+	fn find_nearest_node(
 		&self,
-		path: &Path<NodeID>,
-		start: Point,
-		start_path: Option<Point>,
-		goal: Point,
-		goal_path: Option<Point>,
-		mut get_cost: impl FnMut(Point) -> isize,
-	) -> AbstractPath<N> {
-		let mut ret = AbstractPath::<N>::new(self.neighborhood.clone(), start);
-
-		let mut skip_beginning = false;
-		let mut skip_end = false;
-
-		if let Some(start_path) = start_path {
-			if let PathSegment::Known(ref path) = self.nodes[path[0]].edges[&path[1]] {
-				if path[1] == start {
-					skip_beginning = true;
-				}
-			}
-			ret.add_path_segment(PathSegment::new(
-				Path::from_slice(&[start, start_path], get_cost(start) as usize),
-				true,
-			));
+		pos: Point,
+		get_cost: impl FnMut(Point) -> isize,
+		reverse: bool,
+	) -> Option<(NodeID, Option<Path<Point>>)> {
+		if let Some(id) = self.get_node_id(pos) {
+			return Some((id, None));
 		}
-
-		for (a, b) in path.iter().zip(path.iter().skip(1)) {
-			let path = &self.nodes[*a].edges[&b];
-			ret.add_path_segment(path.clone());
-		}
-
-		if let Some(goal_path) = goal_path {
-			if let PathSegment::Known(ref path) =
-				self.nodes[path[path.len() - 2]].edges[&path[path.len() - 1]]
-			{
-				if path[path.len() - 2] == goal {
-					skip_end = true;
-				}
-			}
-			ret.add_path_segment(PathSegment::new(
-				Path::from_slice(&[goal_path, goal], get_cost(goal_path) as usize),
-				true,
-			));
-		}
-
-		if skip_beginning {
-			ret.skip_beginning((get_cost(start) + get_cost(start_path.unwrap())) as usize);
-		}
-		if skip_end {
-			ret.skip_end((get_cost(goal) + get_cost(goal_path.unwrap())) as usize);
-		}
-
-		ret
+		self.get_chunk(pos)
+			.nearest_node(&self.nodes, pos, get_cost, &self.neighborhood, reverse)
+			.map(|(id, path)| (id, Some(path)))
 	}
 
-	fn add_node(&mut self, pos: Point, mut get_cost: impl FnMut(Point) -> isize) -> NodeID {
-		let cost = get_cost(pos);
-		let id = self.nodes.add_node(pos, cost);
+	fn grid_a_star(
+		&self,
+		start: Point,
+		goal: Point,
+		get_cost: impl FnMut(Point) -> isize,
+	) -> Option<Path<Point>> {
+		grid::a_star_search(
+			|p| self.neighborhood.get_all_neighbors(p),
+			get_cost,
+			start,
+			goal,
+			|p| self.neighborhood.heuristic(p, goal),
+		)
+	}
 
-		let chunk = get_chunk!(self, pos);
+	fn resolve_paths(
+		&self,
+		start: Point,
+		start_path: Option<Path<Point>>,
+		goal_data: &[(Point, NodeID, Option<Path<Point>>)],
+		paths: &NodeIDMap<Path<NodeID>>,
+		mut get_cost: impl FnMut(Point) -> isize,
+	) -> PointMap<AbstractPath<N>> {
+		let mut start_path_map = PointMap::default();
+		let mut ret = PointMap::default();
 
-		if cost < 0 {
-			for &other_id in chunk.nodes.iter() {
-				let other_node = &self.nodes[other_id];
+		for (goal, goal_id, goal_path) in goal_data {
+			let path = if let Some(path) = paths.get(goal_id) {
+				path
+			} else {
+				continue;
+			};
 
-				if other_node.walk_cost < 0 {
+			let mut start_path = start_path.as_ref();
+			let mut skip_first = false;
+			let mut skip_last = false;
+			if start_path.is_some() {
+				let after_start = self.nodes[path[1]].pos;
+				if self.same_chunk(start, after_start) {
+					start_path = Some(start_path_map.entry(after_start).or_insert_with(|| {
+						self.grid_a_star(start, after_start, &mut get_cost)
+							.expect("Inconsistency in Pathfinding")
+					}));
+					skip_first = true;
+				}
+			}
+			let before_goal = self.nodes[path[path.len() - 2]].pos;
+			if goal_path.is_some() && self.same_chunk(*goal, before_goal) {
+				skip_last = true;
+			}
+
+			let mut final_path = if let Some(path) = start_path {
+				AbstractPath::from_known_path(self.neighborhood.clone(), path.clone())
+			} else {
+				AbstractPath::new(self.neighborhood.clone(), start)
+			};
+
+			for (i, (a, b)) in path.iter().zip(path.iter().skip(1)).enumerate() {
+				if (skip_first && i == 0) || (skip_last && i == path.len() - 1) {
 					continue;
 				}
-				let other_pos = other_node.pos;
-				if let Some(path) =
-					chunk.find_path(other_pos, pos, &mut get_cost, &self.neighborhood)
-				{
-					self.nodes.add_edge(
-						other_id,
-						id,
-						PathSegment::new(path, self.config.cache_paths),
-					);
-				}
+				final_path.add_path_segment(self.nodes[*a].edges[&b].clone());
 			}
 
-			let chunk = get_chunk_mut!(self, pos);
-			chunk.nodes.insert(id);
-		} else {
-			let chunk = get_chunk_mut!(self, pos);
-			chunk.add_nodes(
-				vec![id],
-				&mut get_cost,
-				&self.neighborhood,
-				&mut self.nodes,
-				self.config,
-			);
+			if skip_last {
+				final_path.add_path(
+					self.grid_a_star(before_goal, *goal, &mut get_cost)
+						.expect("Inconsistency in Pathfinding"),
+				);
+			} else if let Some(path) = goal_path {
+				final_path.add_path(path.clone());
+			}
+			ret.insert(*goal, final_path);
 		}
-
-		// add any direct neighbors
-		let possible = self.neighborhood.get_all_neighbors(pos).to_vec();
-		let neighbors = self
-			.nodes
-			.values()
-			.filter(|node| possible.contains(&node.pos)) // any Node next to me
-			.filter(|node| !node.edges.contains_key(&id)) // that is not already connected
-			.map(|node| (node.id, node.pos))
-			.to_vec();
-
-		for (other_id, other_pos) in neighbors {
-			if cost >= 0 {
-				let path = Path::from_slice(&[pos, other_pos], get_cost(pos) as usize);
-				self.nodes[id]
-					.edges
-					.insert(other_id, PathSegment::new(path, self.config.cache_paths));
-			}
-			if get_cost(other_pos) >= 0 {
-				let other_path = Path::from_slice(&[other_pos, pos], get_cost(other_pos) as usize);
-
-				self.nodes[other_id]
-					.edges
-					.insert(id, PathSegment::new(other_path, self.config.cache_paths));
-			}
-		}
-
-		id
+		ret
 	}
 
 	fn connect_nodes(&mut self, mut get_cost: impl FnMut(Point) -> isize) {
 		let ids = self.nodes.keys().to_vec();
 		for id in ids {
 			let pos = self.nodes[id].pos;
-			let possible = self.neighborhood.get_all_neighbors(pos).to_vec();
+			let possible: PointSet = self.neighborhood.get_all_neighbors(pos).collect();
 			let neighbors = self
 				.nodes
 				.values()
@@ -1136,23 +1063,6 @@ impl<N: Neighborhood> PathCache<N> {
 			}
 		}
 	}
-
-	#[allow(dead_code)]
-	fn top(&self) -> usize {
-		0
-	}
-	#[allow(dead_code)]
-	fn right(&self) -> usize {
-		self.width
-	}
-	#[allow(dead_code)]
-	fn bottom(&self) -> usize {
-		self.height
-	}
-	#[allow(dead_code)]
-	fn left(&self) -> usize {
-		0
-	}
 }
 
 /// Allows for debugging and visualizing a PathCache.
@@ -1163,20 +1073,23 @@ impl<N: Neighborhood> PathCache<N> {
 #[derive(Debug)]
 pub struct CacheInspector<'a, N: Neighborhood> {
 	src: &'a PathCache<N>,
-	nodes: Vec<NodeID>,
-	current_index: usize,
+	inner: std::vec::IntoIter<NodeID>,
 }
 
 impl<'a, N: Neighborhood> CacheInspector<'a, N> {
-	fn new(src: &'a PathCache<N>) -> Self {
+	/// Creates a new CacheInspector
+	///
+	/// Same as calling [`.inspect_nodes()`](PathCache::inspect_nodes) on the cache
+	pub fn new(src: &'a PathCache<N>) -> Self {
 		CacheInspector {
 			src,
-			nodes: src.nodes.keys().to_vec(),
-			current_index: 0,
+			inner: src.nodes.keys().to_vec().into_iter(),
 		}
 	}
 
-	/// Provides
+	/// Provides the handle to a specific Node.
+	///
+	/// It is recommended to use the `Iterator` implementation instead
 	pub fn get_node(&self, id: NodeID) -> NodeInspector<N> {
 		NodeInspector::new(self.src, id)
 	}
@@ -1185,15 +1098,7 @@ impl<'a, N: Neighborhood> CacheInspector<'a, N> {
 impl<'a, N: Neighborhood> Iterator for CacheInspector<'a, N> {
 	type Item = NodeInspector<'a, N>;
 	fn next(&mut self) -> Option<Self::Item> {
-		let ret = self
-			.nodes
-			.get(self.current_index)
-			.map(|id| NodeInspector::new(self.src, *id));
-
-		if self.current_index < self.nodes.len() {
-			self.current_index += 1;
-		}
-		ret
+		self.inner.next().map(|id| NodeInspector::new(self.src, id))
 	}
 }
 
@@ -1204,7 +1109,7 @@ impl<'a, N: Neighborhood> Iterator for CacheInspector<'a, N> {
 /// Can be obtained by iterating over a [`CacheInspector`] or from [`get_node`](CacheInspector::get_node).
 ///
 /// Gives basic info about the Node and an Iterator over all connected Nodes
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct NodeInspector<'a, N: Neighborhood> {
 	src: &'a PathCache<N>,
 	node: &'a Node,
@@ -1219,11 +1124,13 @@ impl<'a, N: Neighborhood> NodeInspector<'a, N> {
 	}
 
 	/// The position of the Node on the Grid
-	pub fn pos(&self) -> Point {
+	pub fn pos(&self) -> (usize, usize) {
 		self.node.pos
 	}
 
-	/// The internal ID
+	/// The internal unique ID
+	///
+	/// IDs are unique at any point in time, but may be reused if Nodes are deleted.
 	pub fn id(&self) -> NodeID {
 		self.node.id
 	}

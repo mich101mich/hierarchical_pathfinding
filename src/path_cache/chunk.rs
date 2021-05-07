@@ -47,7 +47,7 @@ impl Chunk {
 
 		let nodes: Vec<NodeID> = candidates
 			.into_iter()
-			.map(|p| all_nodes.add_node(p, get_cost(p)))
+			.map(|p| all_nodes.add_node(p, get_cost(p) as usize))
 			.to_vec();
 
 		chunk.add_nodes(nodes, &mut get_cost, neighborhood, all_nodes, config);
@@ -208,7 +208,6 @@ impl Chunk {
 		}
 	}
 
-	#[allow(dead_code)]
 	pub fn find_paths<N: Neighborhood>(
 		&self,
 		start: Point,
@@ -216,6 +215,9 @@ impl Chunk {
 		get_cost: impl FnMut(Point) -> isize,
 		neighborhood: &N,
 	) -> PointMap<Path<Point>> {
+		if !self.in_chunk(start) {
+			return PointMap::default();
+		}
 		grid::dijkstra_search(
 			|p| {
 				neighborhood
@@ -225,10 +227,66 @@ impl Chunk {
 			get_cost,
 			start,
 			goals,
+			false,
 		)
 	}
 
-	#[allow(dead_code)]
+	pub fn nearest_node<N: Neighborhood>(
+		&self,
+		all_nodes: &NodeMap,
+		start: Point,
+		mut get_cost: impl FnMut(Point) -> isize,
+		neighborhood: &N,
+		reverse: bool,
+	) -> Option<(NodeID, Path<Point>)> {
+		let start_cost = get_cost(start);
+		if start_cost < 0 {
+			if !reverse {
+				return None;
+			}
+			self.nodes
+				.iter()
+				.copied()
+				.filter_map(|id| {
+					self.find_path(all_nodes[id].pos, start, &mut get_cost, neighborhood)
+						.map(|path| (id, path))
+				})
+				.min_by_key(|(_, path)| path.cost())
+		} else {
+			let mut points = Vec::with_capacity(self.nodes.len());
+			let mut map = PointMap::default();
+			for id in self.nodes.iter() {
+				let node = &all_nodes[*id];
+				let point = node.pos;
+				points.push(point);
+				map.insert(point, (*id, node.walk_cost));
+			}
+			grid::dijkstra_search(
+				|p| {
+					neighborhood
+						.get_all_neighbors(p)
+						.filter(|n| self.in_chunk(*n))
+				},
+				get_cost,
+				start,
+				&points,
+				true,
+			)
+			.into_iter()
+			.next()
+			.map(|(point, path)| {
+				let (id, node_cost) = map[&point];
+				(
+					id,
+					if reverse {
+						path.reversed(start_cost as usize, node_cost)
+					} else {
+						path
+					},
+				)
+			})
+		}
+	}
 	pub fn find_path<N: Neighborhood>(
 		&self,
 		start: Point,
@@ -236,6 +294,9 @@ impl Chunk {
 		get_cost: impl FnMut(Point) -> isize,
 		neighborhood: &N,
 	) -> Option<Path<Point>> {
+		if !self.in_chunk(start) || !self.in_chunk(goal) {
+			return None;
+		}
 		grid::a_star_search(
 			|p| {
 				neighborhood
