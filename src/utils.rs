@@ -5,6 +5,7 @@ pub trait IterExt<T>: Iterator<Item = T> {
     fn to_vec(self) -> Vec<T>;
 }
 impl<T, I: Iterator<Item = T>> IterExt<T> for I {
+    #[allow(clippy::wrong_self_convention)]
     fn to_vec(self) -> Vec<T> {
         self.collect()
     }

@@ -135,8 +135,8 @@ impl<N: Neighborhood> PathCache<N> {
             height,
             chunks,
             nodes,
-            config,
             neighborhood,
+            config,
         };
 
         // connect neighboring Nodes across Chunk borders
@@ -813,8 +813,9 @@ impl<N: Neighborhood> PathCache<N> {
                 }
             }
 
-            let all_nodes = &self.nodes;
-            candidates.retain(|&p| all_nodes.values().find(|node| node.pos == p).is_none());
+            for node in self.nodes.values() {
+                candidates.remove(&node.pos);
+            }
 
             if candidates.is_empty() {
                 continue;
