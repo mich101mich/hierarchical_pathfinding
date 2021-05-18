@@ -58,11 +58,11 @@ impl<N: Neighborhood> AbstractPath<N> {
         let mut current = &self.path[self.current_index.0];
         if let PathSegment::Unknown { start, end, .. } = *current {
             let path = a_star_search(
-                |p| self.neighborhood.get_all_neighbors(p),
+                &self.neighborhood,
+                |_| true,
                 get_cost.expect("Tried calling next() on a Path that is not fully known. Use safe_next() instead."),
                 start,
                 end,
-                |p| self.neighborhood.heuristic(p, end),
             )
             .unwrap_or_else(|| {
                 panic!(

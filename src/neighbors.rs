@@ -5,8 +5,8 @@ use std::fmt::Debug;
 
 /// Defines how a Path can move along the Grid.
 ///
-/// Different Scenarios may have different constraints as to how a Path may be formed.
-/// For example if Agents can only move along the 4 cardinal directions, any Paths generated should
+/// Different use cases may have different conditions for Paths.
+/// For example if movement is restricted to the 4 cardinal directions, any Paths generated should
 /// reflect that by only containing those steps.
 ///
 /// This Trait is a generalized solution to that problem. It provides a function to query all
@@ -19,11 +19,13 @@ use std::fmt::Debug;
 /// - [`MooreNeighborhood`] for Agents that can move
 /// up, down, left, right, as well as the 4 diagonals (up-right, ...)
 pub trait Neighborhood: Clone + Debug {
-    /// Provides a list of Neighbors of a Point
+    /// Provides all the Neighbors of a Point.
+    ///
+    /// The Neighbors should be written into `target`
     ///
     /// Note that it is not necessary to check weather the Tile at a Point is solid or not.
     /// That check is done later.
-    fn get_all_neighbors(&self, point: Point) -> Box<dyn Iterator<Item = Point>>;
+    fn get_all_neighbors(&self, point: Point, target: &mut Vec<Point>);
     /// Gives a Heuristic for how long it takes to reach `goal` from `point`.
     ///
     /// This is usually the Distance between the two Points in the Metric of your Neighborhood.
@@ -65,18 +67,19 @@ impl ManhattanNeighborhood {
 }
 
 impl Neighborhood for ManhattanNeighborhood {
-    fn get_all_neighbors(&self, point: Point) -> Box<dyn Iterator<Item = Point>> {
+    fn get_all_neighbors(&self, point: Point, target: &mut Vec<Point>) {
         let (width, height) = (self.width, self.height);
 
-        let iter = [(0isize, -1isize), (1, 0), (0, 1), (-1, 0)]
-            .iter()
-            .map(move |(dx, dy)| (point.0 as isize + dx, point.1 as isize + dy))
-            .filter(move |(x, y)| {
-                *x >= 0 && *y >= 0 && (*x as usize) < width && (*y as usize) < height
-            })
-            .map(|(x, y)| (x as usize, y as usize));
+        #[rustfmt::skip]
+        static ALL_DELTAS: [(isize, isize); 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
 
-        Box::new(iter)
+        for (dx, dy) in ALL_DELTAS.iter() {
+            let x = point.0 as isize + dx;
+            let y = point.1 as isize + dy;
+            if x >= 0 && x < width as isize && y >= 0 && y < height as isize {
+                target.push((x as usize, y as usize))
+            }
+        }
     }
     fn heuristic(&self, point: Point, goal: Point) -> usize {
         let diff_0 = if goal.0 > point.0 {
@@ -122,25 +125,19 @@ impl MooreNeighborhood {
 }
 
 impl Neighborhood for MooreNeighborhood {
-    fn get_all_neighbors(&self, point: Point) -> Box<dyn Iterator<Item = Point>> {
+    fn get_all_neighbors(&self, point: Point, target: &mut Vec<Point>) {
         let (width, height) = (self.width, self.height);
 
-        let iter = [
-            (0isize, -1isize),
-            (1, -1),
-            (1, 0),
-            (1, 1),
-            (0, 1),
-            (-1, 1),
-            (-1, 0),
-            (-1, -1),
-        ]
-        .iter()
-        .map(move |(dx, dy)| (point.0 as isize + dx, point.1 as isize + dy))
-        .filter(move |(x, y)| *x >= 0 && *y >= 0 && (*x as usize) < width && (*y as usize) < height)
-        .map(|(x, y)| (x as usize, y as usize));
+        #[rustfmt::skip]
+        static ALL_DELTAS: [(isize, isize); 8] = [(0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1)];
 
-        Box::new(iter)
+        for (dx, dy) in ALL_DELTAS.iter() {
+            let x = point.0 as isize + dx;
+            let y = point.1 as isize + dy;
+            if x >= 0 && x < width as isize && y >= 0 && y < height as isize {
+                target.push((x as usize, y as usize))
+            }
+        }
     }
     fn heuristic(&self, point: Point, goal: Point) -> usize {
         let diff_0 = if goal.0 > point.0 {
@@ -165,10 +162,9 @@ mod tests {
         #[test]
         fn get_all_neighbors() {
             let neighborhood = ManhattanNeighborhood::new(5, 5);
-            assert_eq!(
-                neighborhood.get_all_neighbors((0, 2)).collect::<Vec<_>>(),
-                vec![(0, 1), (1, 2), (0, 3)],
-            );
+            let mut target = vec![];
+            neighborhood.get_all_neighbors((0, 2), &mut target);
+            assert_eq!(target, vec![(0, 1), (1, 2), (0, 3)],);
         }
 
         #[test]
@@ -183,10 +179,9 @@ mod tests {
         #[test]
         fn get_all_neighbors() {
             let neighborhood = MooreNeighborhood::new(5, 5);
-            assert_eq!(
-                neighborhood.get_all_neighbors((0, 2)).collect::<Vec<_>>(),
-                vec![(0, 1), (1, 1), (1, 2), (1, 3), (0, 3)],
-            );
+            let mut target = vec![];
+            neighborhood.get_all_neighbors((0, 2), &mut target);
+            assert_eq!(target, vec![(0, 1), (1, 1), (1, 2), (1, 3), (0, 3)],);
         }
 
         #[test]

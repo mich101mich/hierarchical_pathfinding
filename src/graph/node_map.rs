@@ -1,12 +1,6 @@
 use super::{Node, NodeID};
 use crate::{path::PathSegment, Point};
 
-macro_rules! invalid_id {
-    () => {
-        || panic!("Invalid NodeID in {}:{}", file!(), line!())
-    };
-}
-
 #[derive(Clone, Debug)]
 pub struct NodeMap {
     nodes: Vec<Option<Node>>,
@@ -51,8 +45,9 @@ impl NodeMap {
         src_node.edges.insert(target, path);
     }
 
+    #[track_caller]
     pub fn remove_node(&mut self, id: NodeID) {
-        let node = self.nodes[id as usize].take().unwrap_or_else(invalid_id!());
+        let node = self.nodes[id as usize].take().unwrap();
         for (other_id, _) in node.edges {
             self[other_id].edges.remove(&id);
         }

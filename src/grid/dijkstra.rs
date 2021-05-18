@@ -1,21 +1,17 @@
 use super::{Element, Path};
-use crate::{Point, PointMap, PointSet};
+use crate::{neighbors::Neighborhood, Point, PointMap, PointSet};
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-pub fn dijkstra_search<GetNeighbors, NeighborIter, GetCost>(
-    mut get_all_neighbors: GetNeighbors,
-    mut get_cost: GetCost,
+pub fn dijkstra_search<N: Neighborhood>(
+    neighborhood: &N,
+    mut valid: impl FnMut(Point) -> bool,
+    mut get_cost: impl FnMut(Point) -> isize,
     start: Point,
     goals: &[Point],
     only_closest_goal: bool,
-) -> PointMap<Path<Point>>
-where
-    GetNeighbors: FnMut(Point) -> NeighborIter,
-    NeighborIter: Iterator<Item = Point>,
-    GetCost: FnMut(Point) -> isize,
-{
+) -> PointMap<Path<Point>> {
     let mut visited = PointMap::default();
     let mut next = BinaryHeap::new();
     next.push(Element(start, 0));
@@ -24,6 +20,8 @@ where
     let mut remaining_goals: PointSet = goals.iter().copied().collect();
 
     let mut goal_costs = PointMap::with_capacity_and_hasher(goals.len(), Default::default());
+
+    let mut all_neighbors = vec![];
 
     while let Some(Element(current_id, current_cost)) = next.pop() {
         match current_cost.cmp(&visited[&current_id].0) {
@@ -45,7 +43,12 @@ where
         }
         let other_cost = current_cost + delta_cost as usize;
 
-        for other_id in get_all_neighbors(current_id) {
+        all_neighbors.clear();
+        neighborhood.get_all_neighbors(current_id, &mut all_neighbors);
+        for &other_id in all_neighbors.iter() {
+            if !valid(other_id) {
+                continue;
+            }
             if get_cost(other_id) < 0 && !remaining_goals.contains(&other_id) {
                 continue;
             }
@@ -121,7 +124,8 @@ mod tests {
         let goals = [(4, 4), (2, 0)];
 
         let paths = dijkstra_search(
-            |point| neighborhood.get_all_neighbors(point),
+            &neighborhood,
+            |_| true,
             cost_fn(&grid),
             start,
             &goals,

@@ -219,11 +219,8 @@ impl Chunk {
             return PointMap::default();
         }
         grid::dijkstra_search(
-            |p| {
-                neighborhood
-                    .get_all_neighbors(p)
-                    .filter(|n| self.in_chunk(*n))
-            },
+            neighborhood,
+            |p| self.in_chunk(p),
             get_cost,
             start,
             goals,
@@ -262,11 +259,8 @@ impl Chunk {
                 map.insert(point, (*id, node.walk_cost));
             }
             grid::dijkstra_search(
-                |p| {
-                    neighborhood
-                        .get_all_neighbors(p)
-                        .filter(|n| self.in_chunk(*n))
-                },
+                neighborhood,
+                |p| self.in_chunk(p),
                 get_cost,
                 start,
                 &points,
@@ -297,17 +291,7 @@ impl Chunk {
         if !self.in_chunk(start) || !self.in_chunk(goal) {
             return None;
         }
-        grid::a_star_search(
-            |p| {
-                neighborhood
-                    .get_all_neighbors(p)
-                    .filter(|n| self.in_chunk(*n))
-            },
-            get_cost,
-            start,
-            goal,
-            |p| neighborhood.heuristic(p, goal),
-        )
+        grid::a_star_search(neighborhood, |p| self.in_chunk(p), get_cost, start, goal)
     }
 
     pub fn in_chunk(&self, point: Point) -> bool {
@@ -332,7 +316,8 @@ impl Chunk {
     pub fn is_corner(&self, point: Point) -> bool {
         Dir::all()
             .filter(|&dir| self.sides[dir.num()] && self.at_side(point, dir))
-            .count() == 2
+            .count()
+            == 2
     }
 
     pub fn top(&self) -> usize {

@@ -350,10 +350,10 @@
 //! assert!(path.is_none());
 //!
 //! // Clear a way to the goal
-//! grid[0][1] = 0;
+//! grid[1][2] = 0; // at (2, 1): the wall below the goal
 //!
 //! pathfinding.tiles_changed(
-//!     &[(1, 0)],
+//!     &[(2, 1)],
 //!     cost_fn(&grid),
 //! );
 //!

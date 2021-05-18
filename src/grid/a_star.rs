@@ -1,22 +1,16 @@
-use super::{Cost, HeuristicElement, Path};
-use crate::{Point, PointMap};
+use super::{HeuristicElement, Path};
+use crate::{neighbors::Neighborhood, Point, PointMap};
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-pub fn a_star_search<GetNeighbors, NeighborIter, GetCost, Heuristic>(
-    mut get_all_neighbors: GetNeighbors,
-    mut get_cost: GetCost,
+pub fn a_star_search<N: Neighborhood>(
+    neighborhood: &N,
+    mut valid: impl FnMut(Point) -> bool,
+    mut get_cost: impl FnMut(Point) -> isize,
     start: Point,
     goal: Point,
-    mut heuristic: Heuristic,
-) -> Option<Path<Point>>
-where
-    GetNeighbors: FnMut(Point) -> NeighborIter,
-    NeighborIter: Iterator<Item = Point>,
-    GetCost: FnMut(Point) -> isize,
-    Heuristic: FnMut(Point) -> Cost,
-{
+) -> Option<Path<Point>> {
     if start == goal {
         return Some(Path::from_slice(&[start, start], 0));
     }
@@ -24,6 +18,8 @@ where
     let mut next = BinaryHeap::new();
     next.push(HeuristicElement(start, 0, 0));
     visited.insert(start, (0, start));
+
+    let mut all_neighbors = vec![];
 
     while let Some(HeuristicElement(current_id, current_cost, _)) = next.pop() {
         if current_id == goal {
@@ -41,7 +37,12 @@ where
         }
         let other_cost = current_cost + delta_cost as usize;
 
-        for other_id in get_all_neighbors(current_id) {
+        all_neighbors.clear();
+        neighborhood.get_all_neighbors(current_id, &mut all_neighbors);
+        for &other_id in all_neighbors.iter() {
+            if !valid(other_id) {
+                continue;
+            }
             if get_cost(other_id) < 0 && other_id != goal {
                 continue;
             }
@@ -59,7 +60,7 @@ where
             }
 
             if needs_visit {
-                let heuristic = heuristic(other_id);
+                let heuristic = neighborhood.heuristic(other_id, goal);
                 next.push(HeuristicElement(
                     other_id,
                     other_cost,
@@ -120,13 +121,7 @@ mod tests {
         let start = (0, 0);
         let goal = (2, 0);
 
-        let path = a_star_search(
-            |point| neighborhood.get_all_neighbors(point),
-            cost_fn(&grid),
-            start,
-            goal,
-            |point| neighborhood.heuristic(point, goal),
-        );
+        let path = a_star_search(&neighborhood, |_| true, cost_fn(&grid), start, goal);
 
         assert!(path.is_none());
     }
@@ -156,13 +151,7 @@ mod tests {
 
         let start = (0, 0);
         let goal = (4, 4);
-        let path = a_star_search(
-            |point| neighborhood.get_all_neighbors(point),
-            cost_fn(&grid),
-            start,
-            goal,
-            |point| neighborhood.heuristic(point, goal),
-        );
+        let path = a_star_search(&neighborhood, |_| true, cost_fn(&grid), start, goal);
 
         assert!(path.is_some());
         let path = path.unwrap();

@@ -966,13 +966,7 @@ impl<N: Neighborhood> PathCache<N> {
         goal: Point,
         get_cost: impl FnMut(Point) -> isize,
     ) -> Option<Path<Point>> {
-        grid::a_star_search(
-            |p| self.neighborhood.get_all_neighbors(p),
-            get_cost,
-            start,
-            goal,
-            |p| self.neighborhood.heuristic(p, goal),
-        )
+        grid::a_star_search(&self.neighborhood, |_| true, get_cost, start, goal)
     }
 
     fn resolve_paths(
@@ -1041,7 +1035,9 @@ impl<N: Neighborhood> PathCache<N> {
         let ids = self.nodes.keys().to_vec();
         for id in ids {
             let pos = self.nodes[id].pos;
-            let possible: PointSet = self.neighborhood.get_all_neighbors(pos).collect();
+            let mut target = vec![];
+            self.neighborhood.get_all_neighbors(pos, &mut target);
+            let possible: PointSet = target.into_iter().collect();
             let neighbors = self
                 .nodes
                 .values()
