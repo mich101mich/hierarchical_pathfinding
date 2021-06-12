@@ -325,4 +325,29 @@ mod tests {
         assert_eq!(path.clone().count(), cnt);
         assert_eq!(path.last(), Some(last));
     }
+
+    #[test]
+    fn disconnected_segment_on_long_paths() {
+        use crate::prelude::*;
+        for w in (1..5).map(|w| w * 23) {
+            println!("w: {:?}", w);
+            let pathfinding = PathCache::new(
+                (w, w),
+                |_| 1,
+                MooreNeighborhood::new(w, w),
+                Default::default(),
+            );
+            let path = pathfinding.find_path((0, 0), (w - 1, w - 1), |_| 1);
+            assert!(path.is_some());
+
+            let pathfinding = crate::PathCache::new(
+                (w, w),
+                |_| 1,
+                ManhattanNeighborhood::new(w, w),
+                Default::default(),
+            );
+            let path = pathfinding.find_path((0, 0), (w - 1, w - 1), |_| 1);
+            assert!(path.is_some());
+        }
+    }
 }

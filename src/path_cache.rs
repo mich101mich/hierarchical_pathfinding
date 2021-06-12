@@ -1000,6 +1000,9 @@ impl<N: Neighborhood> PathCache<N> {
                     skip_first = true;
                 }
             }
+
+            // path: ... -> before_goal (len-2) -> goal_id (len-1) (-> actual goal (would be next))
+            // check if direct connection of before_goal -> actual goal is feasible
             let before_goal = self.nodes[path[path.len() - 2]].pos;
             if goal_path.is_some() && self.same_chunk(*goal, before_goal) {
                 skip_last = true;
@@ -1012,7 +1015,8 @@ impl<N: Neighborhood> PathCache<N> {
             };
 
             for (i, (a, b)) in path.iter().zip(path.iter().skip(1)).enumerate() {
-                if (skip_first && i == 0) || (skip_last && i == path.len() - 1) {
+                if (skip_first && i == 0) || (skip_last && i == path.len() - 2) {
+                    // len() - 2 because skip(1) already removes one
                     continue;
                 }
                 final_path.add_path_segment(self.nodes[*a].edges[&b].clone());
