@@ -5,6 +5,7 @@ authors = ["mich101mich <mich101mich@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-rand = "0.6.3"
-rayon = "1.0.3"
+rand = { version = "0.8", features = ["std_rng"] }
+rayon = "1.5"
 hierarchical_pathfinding = { path = ".." }
+fnv = "1.0"
