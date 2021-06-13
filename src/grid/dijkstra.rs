@@ -12,6 +12,9 @@ pub fn dijkstra_search<N: Neighborhood>(
     goals: &[Point],
     only_closest_goal: bool,
 ) -> PointMap<Path<Point>> {
+    if get_cost(start) < 0 {
+        return PointMap::default();
+    }
     let mut visited = PointMap::default();
     let mut next = BinaryHeap::new();
     next.push(Element(start, 0));

@@ -11,6 +11,16 @@ pub use cache_config::PathCacheConfig;
 mod chunk;
 use chunk::Chunk;
 
+enum CostFnWrapper<F1, F2>
+where
+    F1: Fn(Point) -> isize,
+    F2: FnMut(Point) -> isize,
+{
+    #[allow(unused)]
+    Parallel(F1),
+    Sequential(F2),
+}
+
 /// A struct to store the Hierarchical Pathfinding information.
 #[derive(Clone, Debug)]
 pub struct PathCache<N: Neighborhood> {
@@ -34,7 +44,7 @@ macro_rules! get_chunk_mut {
     };
 }
 
-impl<N: Neighborhood> PathCache<N> {
+impl<N: Neighborhood + Sync> PathCache<N> {
     /// Creates a new PathCache
     ///
     /// ## Arguments
@@ -76,59 +86,151 @@ impl<N: Neighborhood> PathCache<N> {
     ///     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
     /// );
     /// ```
-    pub fn new(
+    pub fn new<F: FnMut(Point) -> isize>(
         (width, height): (usize, usize),
-        mut get_cost: impl FnMut(Point) -> isize,
+        get_cost: F,
         neighborhood: N,
         config: PathCacheConfig,
     ) -> PathCache<N> {
+        PathCache::new_internal::<fn(Point) -> isize, F>(
+            (width, height),
+            CostFnWrapper::Sequential(get_cost),
+            neighborhood,
+            config,
+        )
+    }
+
+    /// Same as [`new`](PathCache::new), but uses multiple threads.
+    ///
+    /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
+    #[cfg(feature = "rayon")]
+    pub fn new_parallel<F: Sync + Fn(Point) -> isize>(
+        (width, height): (usize, usize),
+        get_cost: F,
+        neighborhood: N,
+        config: PathCacheConfig,
+    ) -> PathCache<N> {
+        PathCache::new_internal::<F, fn(Point) -> isize>(
+            (width, height),
+            CostFnWrapper::Parallel(get_cost),
+            neighborhood,
+            config,
+        )
+    }
+
+    fn new_internal<F1, F2>(
+        (width, height): (usize, usize),
+        get_cost: CostFnWrapper<F1, F2>,
+        neighborhood: N,
+        config: PathCacheConfig,
+    ) -> PathCache<N>
+    where
+        F1: Sync + Fn(Point) -> isize,
+        F2: FnMut(Point) -> isize,
+    {
         // calculate chunk size
-        let chunk_hor = {
-            let mut w = width / config.chunk_size;
-            if w * config.chunk_size < width {
-                w += 1;
+        let (num_chunks_w, last_width) = {
+            let w = width / config.chunk_size;
+            let remain = width - w * config.chunk_size;
+            if remain > 0 {
+                (w + 1, remain)
+            } else {
+                (w, config.chunk_size)
             }
-            w
         };
-        let chunk_vert = {
-            let mut h = height / config.chunk_size;
-            if h * config.chunk_size < height {
-                h += 1;
+        let (num_chunks_h, last_height) = {
+            let h = height / config.chunk_size;
+            let remain = height - h * config.chunk_size;
+            if remain > 0 {
+                (h + 1, remain)
+            } else {
+                (h, config.chunk_size)
             }
-            h
         };
 
         let mut nodes = NodeMap::new();
 
         // create chunks
-        let mut chunks = Vec::with_capacity(chunk_hor);
-        for x in 0..chunk_hor {
-            let mut row = Vec::with_capacity(chunk_vert);
-            let w = if x == chunk_hor - 1 {
-                width - (chunk_hor - 1) * config.chunk_size
-            } else {
-                config.chunk_size
-            };
-
-            for y in 0..chunk_vert {
-                let h = if y == chunk_vert - 1 {
-                    height - (chunk_vert - 1) * config.chunk_size
-                } else {
-                    config.chunk_size
-                };
-                row.push(Chunk::new(
-                    (x * config.chunk_size, y * config.chunk_size),
-                    (w, h),
-                    (width, height),
-                    &mut get_cost,
-                    &neighborhood,
-                    &mut nodes,
-                    config,
-                ))
+        let chunks = match get_cost {
+            CostFnWrapper::Sequential(mut get_cost) => {
+                let mut chunks = Vec::with_capacity(num_chunks_w);
+                for x in 0..num_chunks_w {
+                    let w = if x == num_chunks_w - 1 {
+                        last_width
+                    } else {
+                        config.chunk_size
+                    };
+                    let mut row = Vec::with_capacity(num_chunks_w);
+                    for y in 0..num_chunks_h {
+                        let h = if y == num_chunks_h - 1 {
+                            last_height
+                        } else {
+                            config.chunk_size
+                        };
+                        row.push(Chunk::new(
+                            (x * config.chunk_size, y * config.chunk_size),
+                            (w, h),
+                            (width, height),
+                            &mut get_cost,
+                            &neighborhood,
+                            &mut nodes,
+                            config,
+                        ));
+                    }
+                    chunks.push(row);
+                }
+                chunks
             }
-
-            chunks.push(row);
-        }
+            #[cfg(not(feature = "rayon"))]
+            _ => panic!("Created a Parallel CostFnWrapper in a non-parallel environment"),
+            #[cfg(feature = "rayon")]
+            CostFnWrapper::Parallel(get_cost) => {
+                use rayon::prelude::*;
+                let raw_chunks = (0..num_chunks_w)
+                    .into_par_iter()
+                    .map(|x| {
+                        let w = if x == num_chunks_w - 1 {
+                            last_width
+                        } else {
+                            config.chunk_size
+                        };
+                        (0..num_chunks_h)
+                            .into_par_iter()
+                            .map(|y| {
+                                let h = if y == num_chunks_h - 1 {
+                                    last_height
+                                } else {
+                                    config.chunk_size
+                                };
+                                let mut node_map = NodeMap::new();
+                                let chunk = Chunk::new(
+                                    (x * config.chunk_size, y * config.chunk_size),
+                                    (w, h),
+                                    (width, height),
+                                    &get_cost,
+                                    &neighborhood,
+                                    &mut node_map,
+                                    config,
+                                );
+                                (chunk, node_map)
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                raw_chunks
+                    .into_iter()
+                    .map(|raw_row| {
+                        raw_row
+                            .into_iter()
+                            .map(|(mut chunk, new_nodes)| {
+                                chunk.nodes = nodes.absorb(new_nodes);
+                                chunk
+                            })
+                            .to_vec()
+                    })
+                    .to_vec()
+            }
+        };
 
         let mut cache = PathCache {
             width,
@@ -140,7 +242,7 @@ impl<N: Neighborhood> PathCache<N> {
         };
 
         // connect neighboring Nodes across Chunk borders
-        cache.connect_nodes(&mut get_cost);
+        cache.connect_nodes();
 
         cache
     }
@@ -740,23 +842,6 @@ impl<N: Neighborhood> PathCache<N> {
                     }
                 }
             }
-
-            // remove all non-border nodes
-            let to_remove = chunk
-                .nodes
-                .iter()
-                .filter(|id| {
-                    let pos = self.nodes[**id].pos;
-                    !chunk.at_any_side(pos)
-                })
-                .copied()
-                .to_vec();
-
-            let chunk = get_chunk_mut!(self, cp);
-            for id in to_remove {
-                chunk.nodes.remove(&id);
-                self.nodes.remove_node(id);
-            }
         }
 
         // remove all nodes of sides in renew
@@ -858,7 +943,7 @@ impl<N: Neighborhood> PathCache<N> {
         }
 
         // re-establish cross-chunk connections
-        self.connect_nodes(&mut get_cost);
+        self.connect_nodes();
     }
 
     /// Allows for debugging and visualizing the PathCache
@@ -937,7 +1022,7 @@ impl<N: Neighborhood> PathCache<N> {
         a.0 / size == b.0 / size && a.1 / size == b.1 / size
     }
 
-    fn get_node_id(&self, pos: Point) -> Option<NodeID> {
+    fn node_at(&self, pos: Point) -> Option<NodeID> {
         self.nodes.id_at(pos)
     }
 
@@ -952,7 +1037,7 @@ impl<N: Neighborhood> PathCache<N> {
         get_cost: impl FnMut(Point) -> isize,
         reverse: bool,
     ) -> Option<(NodeID, Option<Path<Point>>)> {
-        if let Some(id) = self.get_node_id(pos) {
+        if let Some(id) = self.node_at(pos) {
             return Some((id, None));
         }
         self.get_chunk(pos)
@@ -1035,32 +1120,27 @@ impl<N: Neighborhood> PathCache<N> {
         ret
     }
 
-    fn connect_nodes(&mut self, mut get_cost: impl FnMut(Point) -> isize) {
+    fn connect_nodes(&mut self) {
         let ids = self.nodes.keys().to_vec();
+        let mut target = vec![];
         for id in ids {
-            let pos = self.nodes[id].pos;
-            let mut target = vec![];
+            let (pos, cost) = {
+                let node = &self.nodes[id];
+                (node.pos, node.walk_cost)
+            };
+            target.clear();
             self.neighborhood.get_all_neighbors(pos, &mut target);
-            let possible: PointSet = target.into_iter().collect();
-            let neighbors = self
-                .nodes
-                .values()
-                .filter(|node| possible.contains(&node.pos)) // any Node next to me
-                .filter(|node| !node.edges.contains_key(&id)) // that is not already connected
-                .map(|node| (node.id, node.pos))
-                .to_vec();
-
-            for (other_id, other_pos) in neighbors {
-                let path = Path::from_slice(&[pos, other_pos], get_cost(pos) as usize);
-                let other_path = Path::from_slice(&[other_pos, pos], get_cost(other_pos) as usize);
-
-                self.nodes[id]
-                    .edges
-                    .insert(other_id, PathSegment::new(path, self.config.cache_paths));
-
-                self.nodes[other_id]
-                    .edges
-                    .insert(id, PathSegment::new(other_path, self.config.cache_paths));
+            for &other_pos in target.iter() {
+                if let Some(other_id) = self.node_at(other_pos) {
+                    self.nodes.add_edge(
+                        id,
+                        other_id,
+                        PathSegment::new(
+                            Path::from_slice(&[pos, other_pos], cost),
+                            self.config.cache_paths,
+                        ),
+                    );
+                }
             }
         }
     }
@@ -1142,5 +1222,95 @@ impl<'a, N: Neighborhood> NodeInspector<'a, N> {
             .edges
             .iter()
             .map(move |(id, path)| (NodeInspector::new(self.src, *id), path.cost()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::prelude::*;
+
+    #[test]
+    fn new_parallel() {
+        let grid = [
+            [0, 2, 0, 0, 0],
+            [0, 2, 2, 2, 2],
+            [0, 1, 0, 0, 0],
+            [0, 1, 0, 2, 0],
+            [0, 0, 0, 2, 0],
+        ];
+        let (width, height) = (grid.len(), grid[0].len());
+        fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Fn((usize, usize)) -> isize {
+            move |(x, y)| [1, 10, -1][grid[y][x]]
+        }
+        let pathfinding = PathCache::new_parallel(
+            (width, height),
+            cost_fn(&grid),
+            ManhattanNeighborhood::new(width, height),
+            PathCacheConfig {
+                chunk_size: 3,
+                ..Default::default()
+            },
+        );
+        let start = (0, 0);
+        let goal = (4, 4);
+        let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+        let path = path.unwrap();
+        let points: Vec<(usize, usize)> = path.collect();
+        #[rustfmt::skip]
+        assert_eq!(
+            points,
+            vec![(0, 1), (0, 2), (0, 3), (0, 4), (1, 4), (2, 4), (2, 3), (2, 2), (3, 2), (4, 2), (4, 3), (4, 4)],
+        );
+    }
+
+    #[allow(unused)]
+    // #[test]
+    fn random_test() {
+        use rand::prelude::*;
+        use rayon::prelude::*;
+        let mut rng = StdRng::from_entropy();
+
+        for &size in [8, 128, 1024].iter() {
+            let mut grid = vec![vec![0; size]; size];
+            grid.par_iter_mut().for_each(|row| {
+                let mut rng = StdRng::from_entropy();
+                row.fill_with(|| rng.gen_range(-2..7));
+            });
+            let cost_fn = |(x, y): (usize, usize)| grid[y][x];
+            for &chunk_size in [8, 16, 64].iter() {
+                let pathfinding = PathCache::new_parallel(
+                    (size, size),
+                    cost_fn,
+                    ManhattanNeighborhood::new(size, size),
+                    PathCacheConfig {
+                        chunk_size,
+                        ..Default::default()
+                    },
+                );
+                for _ in 0..100 {
+                    let start = (rng.gen_range(0..size), rng.gen_range(0..size));
+                    let goal = (rng.gen_range(0..size), rng.gen_range(0..size));
+                    let a_star_path = pathfinding.grid_a_star(start, goal, cost_fn);
+                    let path = pathfinding.find_path(start, goal, cost_fn);
+                    if a_star_path.is_some() != path.is_some() {
+                        use std::io::Write;
+                        let mut out = std::fs::File::create("cache.txt").unwrap();
+                        writeln!(out, "start: {:?},  goal: {:?}", start, goal).unwrap();
+                        writeln!(out, "a_star_path: {:?}", a_star_path).unwrap();
+                        writeln!(out, "our path: {:?}", path).unwrap();
+                        writeln!(out, "{:#?}", pathfinding).unwrap();
+
+                        let mut out = std::fs::File::create("grid.txt").unwrap();
+                        for row in grid.iter() {
+                            for cell in row.iter() {
+                                write!(out, "{}", if *cell < 0 { '#' } else { ' ' }).unwrap();
+                            }
+                            writeln!(out).unwrap();
+                        }
+                        panic!("Failed");
+                    }
+                }
+            }
+        }
     }
 }

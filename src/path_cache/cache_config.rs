@@ -13,6 +13,41 @@
 ///     Default::default()
 /// );
 /// ```
+///
+/// ### Performance
+/// For testing, a set of different Grids were used:
+/// - "empty" is simply an Grid where all costs are `1`.
+/// - "snake" has a single long winding corridor
+/// - "random" is completely random costs and walls
+///
+/// Each Grid was tested as 16x16, 128x128 and 1024x1024. The 16x16 Grid, however, produced only
+/// durations less than 100 μs, which are too inaccurate to be measured.
+///
+/// The full List can be seen on [GitHub](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/benchmark/)
+/// in the `output_*.txt` files.
+///
+/// empty, 128x128:
+/// ![empty128](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/empty128.png?raw=true)
+/// empty, 1024x1024:
+/// ![empty1024](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/empty1024.png?raw=true)
+/// snake, 128x128:
+/// ![snake128](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/snake128.png?raw=true)
+/// snake, 1024x1024:
+/// ![snake1024](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/snake1024.png?raw=true)
+/// random, 128x128:
+/// ![random128](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/random128.png?raw=true)
+/// random, 1024x1024:
+/// ![random1024](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/random1024.png?raw=true)
+///
+/// Conclusions:
+/// - Bigger Chunks are usually better
+/// - Chunks that take up the entire Grid are useless
+///
+/// ### Memory
+/// for 1024x1024: 100MB - 1000MB, depending on Node density on the Grid.
+///
+/// Can be drastically reduced by setting `cache_paths` to `false`, at the expense of repeated
+/// calculations when using a Path.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PathCacheConfig {
     /// The size of the individual Chunks (defaults to `8`)
@@ -45,8 +80,11 @@ pub struct PathCacheConfig {
     ///
     /// `false`: only store the Cost of the Path.
     ///
-    /// If set to false, calculating the full Path between two Points takes significantly more time.
-    /// See [`AbstractPath`](crate::internals::AbstractPath) for more details.
+    /// This will not affect the calculations or the time it takes to calculate the initial Path.
+    /// It only makes a difference when iterating over the returned Path, because that requires
+    /// re-calculating the next segment (see [`safe_next`](crate::internals::AbstractPath::safe_next) on [`AbstractPath`](crate::internals::AbstractPath)).
+    ///
+    /// Drastically reduces Memory usage.
     pub cache_paths: bool,
     /// `true` (default): When a Path is short (roughly `Length < 2 * chunk_size`), a regular
     /// A* search is performed on the Grid **after** HPA* calculated a Path to confirm the
@@ -63,6 +101,8 @@ pub struct PathCacheConfig {
     /// `false` (default): Nodes are placed on only some chunk entrances.
     ///
     /// The exact effect depends greatly on the Grid and how the Chunks and their entrances align.
+    /// It is questionable weather or not you should use Hierarchical Pathfinding if you enable
+    /// this...
     pub perfect_paths: bool,
 }
 
@@ -74,7 +114,7 @@ impl PathCacheConfig {
     /// # use hierarchical_pathfinding::PathCacheConfig;
     /// assert_eq!(
     ///     PathCacheConfig {
-    ///         chunk_size: 32,
+    ///         chunk_size: 64,
     ///         cache_paths: false,
     ///         a_star_fallback: true,
     ///         perfect_paths: false,
@@ -83,7 +123,7 @@ impl PathCacheConfig {
     /// );
     /// ```
     pub const LOW_MEM: PathCacheConfig = PathCacheConfig {
-        chunk_size: 32,
+        chunk_size: 64,
         cache_paths: false,
         a_star_fallback: true,
         perfect_paths: false,
@@ -95,7 +135,7 @@ impl PathCacheConfig {
     /// # use hierarchical_pathfinding::PathCacheConfig;
     /// assert_eq!(
     ///     PathCacheConfig {
-    ///         chunk_size: 8,
+    ///         chunk_size: 16,
     ///         cache_paths: true,
     ///         a_star_fallback: false,
     ///         perfect_paths: false,
@@ -104,7 +144,7 @@ impl PathCacheConfig {
     /// );
     /// ```
     pub const HIGH_PERFORMANCE: PathCacheConfig = PathCacheConfig {
-        chunk_size: 8,
+        chunk_size: 16,
         cache_paths: true,
         a_star_fallback: false,
         perfect_paths: false,

@@ -39,7 +39,7 @@ impl<N: Neighborhood> AbstractPath<N> {
     ///
     /// This value is always known and requires no further calculations.
     ///
-    /// Note that the [`len`](AbstractPath::len) method is provided by [`ExactIterator`] and tells
+    /// Note that the [`len`](AbstractPath::len) method is provided by [`ExactSizeIterator`] and tells
     /// the remaining elements, whereas the one stays constant.
     pub fn length(&self) -> usize {
         self.total_length
