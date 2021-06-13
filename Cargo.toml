@@ -9,7 +9,7 @@ readme = "readme.md"
 license = "MIT"
 keywords = ["pathfinding", "dijkstra", "a-star", "grid"]
 categories = ["algorithms"]
-exclude = ["/.circleci/*", "/.travis.yml", "/.vscode/*", "/todo.md", "/.gitignore", "/.github/*"]
+exclude = ["/.vscode/*", "/todo.md", "/.gitignore", "/.github/*", "/benchmark/*", "/img/*"]
 
 [dependencies]
 fnv = "1.0"
