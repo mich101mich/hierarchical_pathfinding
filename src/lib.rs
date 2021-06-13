@@ -366,8 +366,6 @@
 //! ##### Configuration
 //! The last parameter for PathCache::new is a [`PathCacheConfig`] object with different options to have more control over the generated PathCache.
 //! These options are mostly used to adjust the balance between Performance and Memory Usage, with the default values aiming more at Performance.
-//! The PathCacheConfig struct also provides defaults for low Memory Usage [`PathCacheConfig::LOW_MEM`]
-//! or best Performance [`PathCacheConfig::HIGH_PERFORMANCE`]
 //! ```
 //! # use hierarchical_pathfinding::prelude::*;
 //! # let mut grid = [

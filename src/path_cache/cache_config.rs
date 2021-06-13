@@ -26,22 +26,15 @@
 /// The full List can be seen on [GitHub](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/benchmark/)
 /// in the `output_*.txt` files.
 ///
-/// empty, 128x128:
-/// ![empty128](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/empty128.png?raw=true)
-/// empty, 1024x1024:
-/// ![empty1024](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/empty1024.png?raw=true)
-/// snake, 128x128:
-/// ![snake128](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/snake128.png?raw=true)
-/// snake, 1024x1024:
-/// ![snake1024](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/snake1024.png?raw=true)
-/// random, 128x128:
-/// ![random128](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/random128.png?raw=true)
-/// random, 1024x1024:
-/// ![random1024](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/random1024.png?raw=true)
+/// Grid   | 128x128 | 1024x1024
+/// -------|:-------:|:---------:
+/// empty  | ![](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/empty128.png?raw=true) | ![](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/empty1024.png?raw=true)
+/// snake  | ![](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/snake128.png?raw=true) | ![](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/snake1024.png?raw=true)
+/// random | ![](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/random128.png?raw=true)| ![](https://github.com/mich101mich/hierarchical_pathfinding/blob/benchmark/img/plot/random1024.png?raw=true)
 ///
 /// Conclusions:
 /// - Bigger Chunks are usually better
-/// - Chunks that take up the entire Grid are useless
+/// - Chunks that take up the entire Grid are useless (see 128x128)
 ///
 /// ### Memory
 /// for 1024x1024: 100MB - 1000MB, depending on Node density on the Grid.
