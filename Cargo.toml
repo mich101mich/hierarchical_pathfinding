@@ -1,17 +1,15 @@
 [package]
 name = "hierarchical_pathfinding"
-version = "0.1.0"
+version = "0.4.3"
 authors = ["mich101mich <mich101mich@gmail.com>"]
 edition = "2018"
-description = "A crate to quickly approximate Paths on a Grid."
+description = "Quickly approximate Paths on a Grid"
 repository = "https://github.com/mich101mich/hierarchical_pathfinding"
 readme = "readme.md"
+license = "MIT"
 keywords = ["pathfinding", "dijkstra", "a-star", "grid"]
 categories = ["algorithms"]
-exclude = ["/.circleci/*", "/.travis.yml", "/.vscode/*", "/benchmark/*"]
-
-[badges]
-travis-ci = { repository = "mich101mich/hierarchical_pathfinding" }
-circle-ci = { repository = "mich101mich/hierarchical_pathfinding" }
+exclude = ["/.vscode/*", "/todo.md", "/.gitignore", "/.github/*", "/benchmark/*"]
 
 [dependencies]
+fnv = "1.0"
