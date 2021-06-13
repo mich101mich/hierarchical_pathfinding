@@ -13,3 +13,10 @@ exclude = ["/.vscode/*", "/todo.md", "/.gitignore", "/.github/*", "/benchmark/*"
 
 [dependencies]
 fnv = "1.0"
+rayon = { version = "1.5", optional = true }
+
+[dev-dependencies]
+rand = { version = "0.8", features = ["std_rng"] }
+
+[features]
+default = ["rayon"]

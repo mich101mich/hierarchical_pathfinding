@@ -1,10 +1,6 @@
 use super::Cost;
 
-#[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
-
-#[cfg(target_arch = "wasm32")]
-use std::rc::Rc as Arc; // TODO: What does Arc do on wasm?
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Path<P> {

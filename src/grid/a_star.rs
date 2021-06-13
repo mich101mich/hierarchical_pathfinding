@@ -11,6 +11,9 @@ pub fn a_star_search<N: Neighborhood>(
     start: Point,
     goal: Point,
 ) -> Option<Path<Point>> {
+    if get_cost(start) < 0 {
+        return None;
+    }
     if start == goal {
         return Some(Path::from_slice(&[start, start], 0));
     }
