@@ -949,8 +949,244 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             );
         }
 
+
         // re-establish cross-chunk connections
         self.connect_nodes();
+    }
+
+    /// Same as [`tiles_changed`](PathCache::tiles_changed), but uses multiple threads.
+    ///
+    /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
+    #[cfg(feature = "rayon")]
+    pub fn tiles_changed_parallel<F: Sync + Fn(Point) -> isize>(
+        &mut self,
+        tiles: &[Point],
+        get_cost: F,
+    ) {
+        use hashbrown::HashMap;
+        use rayon::prelude::*;
+
+        let size = self.config.chunk_size;
+
+        use std::time::Instant;
+        let outer_timer = Instant::now();
+
+        let mut dirty = PointMap::default();
+        for &p in tiles {
+            let chunk_pos = self.get_chunk_pos(p);
+            dirty.entry(chunk_pos).or_insert_with(Vec::new).push(p);
+        }
+
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        enum Renew {
+            No,
+            Inner,
+            Corner(Point),
+            All,
+        }
+
+        // map of chunk_pos => array: [Renew; 4] where array[side] says if chunk[side] needs to be renewed
+        let mut renew = PointMap::default();
+
+        for (&cp, positions) in dirty.iter() {
+            let chunk = self.get_chunk(cp);
+            // for every changed tile in the chunk
+            for &p in positions {
+                // check every side that this tile is on
+                for dir in Dir::all().filter(|dir| chunk.sides[dir.num()] && chunk.at_side(p, *dir))
+                {
+                    // if there is a chunk in that direction
+                    let other_pos = jump_in_dir(cp, dir, size, (0, 0), (self.width, self.height))
+                        .expect("Internal Error #2 in PathCache. Please report this");
+
+                    // mark the current and other side
+                    let own = &mut renew.entry(cp).or_insert([Renew::No; 4])[dir.num()];
+                    let old = *own;
+                    if chunk.is_corner(p) {
+                        if old == Renew::No || old == Renew::Inner {
+                            *own = Renew::Corner(p);
+                        } else if let Renew::Corner(p2) = old {
+                            if p2 != p {
+                                *own = Renew::All;
+                            }
+                        } else if old != Renew::All {
+                            *own = Renew::Corner(p)
+                        }
+                    } else {
+                        // All > Corner > Inner > No, and we don't want to override anything greater than Inner
+                        if *own == Renew::No {
+                            *own = Renew::Inner;
+                        }
+                    }
+                    let other =
+                        &mut renew.entry(other_pos).or_insert([Renew::No; 4])[dir.opposite().num()];
+                    if *other == Renew::No {
+                        *other = Renew::Inner;
+                    }
+                }
+            }
+        }
+
+        let timer = Instant::now();
+
+        // remove all nodes of sides in renew
+        for (&cp, sides) in renew.iter() {
+            let removed = {
+                let chunk = self.get_chunk(cp);
+                chunk
+                    .nodes
+                    .iter()
+                    .filter(|id| {
+                        let pos = self.nodes[**id].pos;
+                        let corner = chunk.is_corner(pos);
+                        Dir::all().any(|dir| match sides[dir.num()] {
+                            Renew::No => false,
+                            Renew::Inner => !corner,
+                            Renew::Corner(c) => !corner || c == pos,
+                            Renew::All => true,
+                        } && chunk.at_side(pos, dir))
+                    })
+                    .copied()
+                    .to_vec()
+            };
+
+            let chunk_index = self.get_chunk_index(cp);
+            let chunk = get_chunk_mut!(self, chunk_index);
+
+            for id in removed {
+                chunk.nodes.remove(&id);
+                self.nodes.remove_node(id); // This is where the majority of time is spent here
+            }
+        }
+
+        println!(
+            "time to remove nodes of sides in renew: {:?}",
+            Instant::now() - timer
+        );
+
+        // remove all Paths in changed chunks
+        for cp in dirty.keys() {
+            let chunk_index = self.get_chunk_index(*cp);
+            let chunk = get_chunk!(self, chunk_index);
+            for id in chunk.nodes.iter() {
+                self.nodes[*id].edges.clear();
+            }
+        }
+
+        let timer = Instant::now();
+        // recreate sides in renew
+        for (&cp, sides) in renew.iter() {
+            let mut candidates = PointSet::default();
+            let chunk_index = self.get_chunk_index(cp);
+            let chunk = get_chunk!(self, chunk_index);
+
+            for dir in Dir::all() {
+                if sides[dir.num()] != Renew::No {
+                    chunk.calculate_side_nodes(
+                        dir,
+                        (self.width, self.height),
+                        &get_cost,
+                        self.config,
+                        &mut candidates,
+                    );
+                }
+            }
+
+            // Only include nodes that aren't already part of the map
+            let candidates: PointSet = candidates
+                .iter()
+                .filter(|&&pos| self.nodes.id_at(pos).is_none())
+                .map(|&a| a)
+                .collect();
+
+            if candidates.is_empty() {
+                continue;
+            }
+
+            let all_nodes = &mut self.nodes;
+            let nodes = candidates
+                .into_iter()
+                .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
+                .to_vec();
+
+            if !dirty.contains_key(&cp) {
+                let chunk = get_chunk_mut!(self, chunk_index);
+                chunk.add_nodes(
+                    nodes,
+                    &get_cost,
+                    &self.neighborhood,
+                    &mut self.nodes,
+                    &self.config,
+                );
+            } else {
+                for id in nodes {
+                    let chunk = get_chunk_mut!(self, chunk_index);
+                    chunk.nodes.insert(id);
+                }
+            }
+        }
+
+        println!("time to recreates sides: {:?}", Instant::now() - timer);
+
+        let timer = Instant::now();
+
+        let dirty_indices: hashbrown::HashSet<usize> = dirty
+            .keys()
+            .map(|(x, y)| self.get_chunk_index((*x, *y)))
+            .collect();
+
+        let mid_timer = Instant::now();
+
+        let paths: Vec<HashMap<u32, HashMap<(usize, usize), Path<(usize, usize)>>>> = {
+            use std::sync::Arc;
+            let neighborhood = Arc::new(&self.neighborhood);
+            let all_nodes = Arc::new(&self.nodes);
+
+            self.chunks
+                .par_iter_mut()
+                .enumerate()
+                .filter(|(index, _chunk)| dirty_indices.contains(index))
+                .map(|(_index, chunk)| {
+                    let nodes = chunk.nodes.iter().copied().to_vec();
+                    chunk.nodes.clear();
+
+                    chunk.add_nodes_parallel(nodes, &get_cost, *neighborhood, &all_nodes)
+                })
+                .collect()
+        };
+
+        println!("time to get paths: {:?}", Instant::now() - mid_timer);
+
+        let inner_timer = Instant::now();
+
+        for thing in paths {
+            for (id, thing2) in thing {
+                for (other_pos, path) in thing2 {
+                    let other_id = self
+                        .nodes
+                        .id_at(other_pos)
+                        .expect("Internal Error #5 in Chunk. Please report this");
+
+                    self.nodes.add_edge(
+                        id,
+                        other_id,
+                        PathSegment::new(path, self.config.cache_paths),
+                    );
+                }
+            }
+        }
+
+        println!("time to update edges: {:?}", Instant::now() - inner_timer);
+
+        println!("time to recreate paths renew: {:?}", Instant::now() - timer);
+
+        // let timer = Instant::now();
+
+        // re-establish cross-chunk connections
+        self.connect_nodes();
+
+        // println!("time to connect nodes: {:?}", Instant::now() - timer);
+        println!("total time: {:?}", Instant::now() - outer_timer);
     }
 
     /// Allows for debugging and visualizing the PathCache
@@ -1320,6 +1556,58 @@ mod tests {
 
         let point = (0, 4);
         assert_eq!(pathfinding.get_chunk_index(point), 2);
+    }
+
+    #[test]
+    fn update_path_parallel() {
+        let mut grid = [
+            [0, 2, 0, 0, 0],
+            [0, 2, 2, 2, 2],
+            [0, 1, 0, 0, 0],
+            [0, 1, 0, 2, 0],
+            [0, 0, 0, 2, 0],
+        ];
+        let (width, height) = (grid.len(), grid[0].len());
+        fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Fn((usize, usize)) -> isize {
+            move |(x, y)| [1, 10, -1][grid[y][x]]
+        }
+
+        let mut pathfinding = PathCache::new_parallel(
+            (width, height),
+            cost_fn(&grid),
+            MooreNeighborhood::new(width, height),
+            PathCacheConfig {
+                chunk_size: 3,
+                ..Default::default()
+            },
+        );
+
+        let start = (0, 0);
+        let goal = (4, 4);
+        let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+        let path = path.unwrap();
+        let points: Vec<(usize, usize)> = path.collect();
+        #[rustfmt::skip]
+        assert_eq!(
+            points,
+            vec![(0, 1), (0, 2), (0, 3), (1, 4), (2, 3), (3, 2), (4, 3), (4, 4)],
+        );
+
+        grid[2][1] = 0;
+        let changed_tiles = [(1, 1)];
+
+        pathfinding.tiles_changed_parallel(&changed_tiles, cost_fn(&grid));
+
+        let start = (0, 0);
+        let goal = (4, 4);
+        let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+        let path = path.unwrap();
+        let points: Vec<(usize, usize)> = path.collect();
+        #[rustfmt::skip]
+        assert_eq!(
+            points,
+            vec![(0, 1), (1, 2), (2, 2), (3, 2), (4, 3), (4, 4)],
+        );
     }
 
     #[allow(unused)]

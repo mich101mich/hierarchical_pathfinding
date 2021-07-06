@@ -1,3 +1,5 @@
+use hashbrown::HashMap;
+
 use crate::{
     graph::{NodeID, NodeIDSet, NodeMap},
     neighbors::Neighborhood,
@@ -206,6 +208,40 @@ impl Chunk {
                 all_nodes.add_edge(id, other_id, PathSegment::new(path, config.cache_paths));
             }
         }
+    }
+
+    pub fn add_nodes_parallel<N: Neighborhood + Sync>(
+        &mut self,
+        mut to_visit: Vec<NodeID>,
+        mut get_cost: impl FnMut(Point) -> isize,
+        neighborhood: &N,
+        all_nodes: &NodeMap,
+    ) -> HashMap<u32, HashMap<(usize, usize), Path<(usize, usize)>>> {
+        let mut points = self
+            .nodes
+            .iter()
+            .chain(to_visit.iter()) // results in to_visit points at the end => enables pop()
+            .map(|id| all_nodes[*id].pos)
+            .to_vec();
+
+        for &id in to_visit.iter() {
+            self.nodes.insert(id);
+        }
+
+        let mut all_paths = HashMap::new();
+
+        // connect every Node to every other Node
+        while let Some(id) = to_visit.pop() {
+            let point = points
+                .pop()
+                .expect("Internal Error #4 in Chunk. Please report this");
+
+            let paths = self.find_paths(point, &points, &mut get_cost, neighborhood);
+
+            all_paths.insert(id, paths);
+        }
+
+        all_paths
     }
 
     pub fn find_paths<N: Neighborhood>(
