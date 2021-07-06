@@ -26,7 +26,7 @@ where
 pub struct PathCache<N: Neighborhood> {
     width: usize,
     height: usize,
-    chunks: Vec<Vec<Chunk>>,
+    chunks: Vec<Chunk>,
     nodes: NodeMap,
     neighborhood: N,
     config: PathCacheConfig,
@@ -34,13 +34,13 @@ pub struct PathCache<N: Neighborhood> {
 
 // this is a macro so that it only borrows self.chunks instead of self
 macro_rules! get_chunk {
-    ($obj: ident, $point: ident) => {
-        &$obj.chunks[$point.0 / $obj.config.chunk_size][$point.1 / $obj.config.chunk_size]
+    ($obj: ident, $index: ident) => {
+        &$obj.chunks[$index]
     };
 }
 macro_rules! get_chunk_mut {
-    ($obj: ident, $point: ident) => {
-        &mut $obj.chunks[$point.0 / $obj.config.chunk_size][$point.1 / $obj.config.chunk_size]
+    ($obj: ident, $index: ident) => {
+        &mut $obj.chunks[$index]
     };
 }
 
@@ -153,21 +153,22 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         // create chunks
         let chunks = match get_cost {
             CostFnWrapper::Sequential(mut get_cost) => {
-                let mut chunks = Vec::with_capacity(num_chunks_w);
-                for x in 0..num_chunks_w {
-                    let w = if x == num_chunks_w - 1 {
-                        last_width
+                let mut chunks: Vec<Chunk> = Vec::with_capacity(num_chunks_w * num_chunks_h);
+                for y in 0..num_chunks_h {
+                    let h = if y == num_chunks_h - 1 {
+                        last_height
                     } else {
                         config.chunk_size
                     };
-                    let mut row = Vec::with_capacity(num_chunks_w);
-                    for y in 0..num_chunks_h {
-                        let h = if y == num_chunks_h - 1 {
-                            last_height
+
+                    for x in 0..num_chunks_w {
+                        let w = if x == num_chunks_w - 1 {
+                            last_width
                         } else {
                             config.chunk_size
                         };
-                        row.push(Chunk::new(
+
+                        chunks.push(Chunk::new(
                             (x * config.chunk_size, y * config.chunk_size),
                             (w, h),
                             (width, height),
@@ -177,7 +178,6 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                             config,
                         ));
                     }
-                    chunks.push(row);
                 }
                 chunks
             }
@@ -186,47 +186,46 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             #[cfg(feature = "rayon")]
             CostFnWrapper::Parallel(get_cost) => {
                 use rayon::prelude::*;
-                let raw_chunks = (0..num_chunks_w)
+
+                let raw_chunks: Vec<(Chunk, NodeMap)> = (0..num_chunks_h * num_chunks_w)
                     .into_par_iter()
-                    .map(|x| {
+                    .map(|index| {
+                        let x = index % num_chunks_w;
+                        let y = index / num_chunks_w;
+
                         let w = if x == num_chunks_w - 1 {
                             last_width
                         } else {
                             config.chunk_size
                         };
-                        (0..num_chunks_h)
-                            .into_par_iter()
-                            .map(|y| {
-                                let h = if y == num_chunks_h - 1 {
-                                    last_height
-                                } else {
-                                    config.chunk_size
-                                };
-                                let mut node_map = NodeMap::new();
-                                let chunk = Chunk::new(
-                                    (x * config.chunk_size, y * config.chunk_size),
-                                    (w, h),
-                                    (width, height),
-                                    &get_cost,
-                                    &neighborhood,
-                                    &mut node_map,
-                                    config,
-                                );
-                                (chunk, node_map)
-                            })
-                            .collect::<Vec<_>>()
+
+                        let h = if y == num_chunks_h - 1 {
+                            last_height
+                        } else {
+                            config.chunk_size
+                        };
+
+                        let mut node_map = NodeMap::new();
+
+                        let chunk = Chunk::new(
+                            (x * config.chunk_size, y * config.chunk_size),
+                            (w, h),
+                            (width, height),
+                            &get_cost,
+                            &neighborhood,
+                            &mut node_map,
+                            config,
+                        );
+
+                        (chunk, node_map)
                     })
-                    .collect::<Vec<_>>();
+                    .collect();
+
                 raw_chunks
                     .into_iter()
-                    .map(|raw_row| {
-                        raw_row
-                            .into_iter()
-                            .map(|(mut chunk, new_nodes)| {
-                                chunk.nodes = nodes.absorb(new_nodes);
-                                chunk
-                            })
-                            .to_vec()
+                    .map(|(mut chunk, new_nodes)| {
+                        chunk.nodes = nodes.absorb(new_nodes);
+                        chunk
                     })
                     .to_vec()
             }
@@ -865,7 +864,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                     .to_vec()
             };
 
-            let chunk = get_chunk_mut!(self, cp);
+            let chunk_index = self.get_chunk_index(cp);
+            let chunk = get_chunk_mut!(self, chunk_index);
 
             for id in removed {
                 chunk.nodes.remove(&id);
@@ -875,7 +875,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         // remove all Paths in changed chunks
         for cp in dirty.keys() {
-            let chunk = get_chunk!(self, cp);
+            let chunk_index = self.get_chunk_index(*cp);
+            let chunk = get_chunk!(self, chunk_index);
             for id in chunk.nodes.iter() {
                 self.nodes[*id].edges.clear();
             }
@@ -884,7 +885,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         // recreate sides in renew
         for (&cp, sides) in renew.iter() {
             let mut candidates = PointSet::default();
-            let chunk = get_chunk_mut!(self, cp);
+            let chunk_index = self.get_chunk_index(cp);
+            let chunk = get_chunk_mut!(self, chunk_index);
 
             for dir in Dir::all() {
                 if sides[dir.num()] != Renew::No {
@@ -929,7 +931,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         // recreate Paths
         for cp in dirty.keys() {
-            let chunk = get_chunk_mut!(self, cp);
+            let chunk_index = self.get_chunk_index(*cp);
+            let chunk = get_chunk_mut!(self, chunk_index);
             let nodes = chunk.nodes.iter().copied().to_vec();
             chunk.nodes.clear();
 
@@ -1014,7 +1017,20 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     }
 
     fn get_chunk(&self, point: Point) -> &Chunk {
-        get_chunk!(self, point)
+        let index = self.get_chunk_index(point);
+        get_chunk!(self, index)
+    }
+
+    fn get_chunk_index(&self, point: Point) -> usize {
+        let size = self.config.chunk_size;
+
+        let (x, y) = ((point.0 / size), (point.1 / size));
+        let chunk_count_x = match self.width % size {
+            0 => self.width / size,
+            _ => (self.width / size) + 1,
+        };
+
+        y * chunk_count_x + x
     }
 
     fn same_chunk(&self, a: Point, b: Point) -> bool {
@@ -1261,6 +1277,45 @@ mod tests {
             points,
             vec![(0, 1), (0, 2), (0, 3), (0, 4), (1, 4), (2, 4), (2, 3), (2, 2), (3, 2), (4, 2), (4, 3), (4, 4)],
         );
+    }
+
+    #[test]
+    fn get_chunk_index() {
+        let grid = [
+            [0, 2, 0, 0, 0],
+            [0, 2, 2, 2, 2],
+            [0, 1, 0, 0, 0],
+            [0, 1, 0, 2, 0],
+            [0, 0, 0, 2, 0],
+        ];
+        let (width, height) = (grid.len(), grid[0].len());
+        fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Fn((usize, usize)) -> isize {
+            move |(x, y)| [1, 10, -1][grid[y][x]]
+        }
+        let pathfinding = PathCache::new_parallel(
+            (width, height),
+            cost_fn(&grid),
+            ManhattanNeighborhood::new(width, height),
+            PathCacheConfig {
+                chunk_size: 3,
+                ..Default::default()
+            },
+        );
+
+        let point = (0, 0);
+        assert_eq!(pathfinding.get_chunk_index(point), 0);
+
+        let point = (4, 0);
+        assert_eq!(pathfinding.get_chunk_index(point), 1);
+
+        let point = (3, 2);
+        assert_eq!(pathfinding.get_chunk_index(point), 1);
+
+        let point = (4, 4);
+        assert_eq!(pathfinding.get_chunk_index(point), 3);
+
+        let point = (0, 4);
+        assert_eq!(pathfinding.get_chunk_index(point), 2);
     }
 
     #[allow(unused)]
