@@ -50,7 +50,7 @@ impl Chunk {
             .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
             .to_vec();
 
-        chunk.add_nodes(nodes, &mut get_cost, neighborhood, all_nodes, config);
+        chunk.add_nodes(nodes, &mut get_cost, neighborhood, all_nodes, &config);
 
         chunk
     }
@@ -177,7 +177,7 @@ impl Chunk {
         mut get_cost: impl FnMut(Point) -> isize,
         neighborhood: &N,
         all_nodes: &mut NodeMap,
-        config: PathCacheConfig,
+        config: &PathCacheConfig,
     ) {
         let mut points = self
             .nodes

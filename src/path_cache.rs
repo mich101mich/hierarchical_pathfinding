@@ -920,7 +920,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                     &mut get_cost,
                     &self.neighborhood,
                     &mut self.nodes,
-                    self.config,
+                    &self.config,
                 );
             } else {
                 for id in nodes {
@@ -941,7 +941,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 &mut get_cost,
                 &self.neighborhood,
                 &mut self.nodes,
-                self.config,
+                &self.config,
             );
         }
 
