@@ -5,9 +5,11 @@ pub type NodeID = u32;
 use std::hash::{BuildHasherDefault, Hasher};
 
 /// A specialized [`HashMap`](std::collections::HashMap) for NodeIDs with a faster Hasher
-pub type NodeIDMap<V> = std::collections::HashMap<NodeID, V, BuildHasherDefault<NodeIDHasher>>;
+pub type NodeIDMap<V> = hashbrown::HashMap<NodeID, V, BuildHasherDefault<NodeIDHasher>>;
+
 /// A specialized [`HashSet`](std::collections::HashSet) for NodeIDs with a faster Hasher
-pub type NodeIDSet = std::collections::HashSet<NodeID, BuildHasherDefault<NodeIDHasher>>;
+pub type NodeIDSet = hashbrown::HashSet<NodeID, BuildHasherDefault<NodeIDHasher>>;
+
 
 /// A [`Hasher`](Hasher) specialized on NodeIDs
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

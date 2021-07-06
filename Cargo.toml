@@ -9,14 +9,28 @@ readme = "readme.md"
 license = "MIT"
 keywords = ["pathfinding", "dijkstra", "a-star", "grid"]
 categories = ["algorithms"]
-exclude = ["/.vscode/*", "/todo.md", "/.gitignore", "/.github/*", "/benchmark/*", "/img/*"]
+exclude = [
+    "/.vscode/*",
+    "/todo.md",
+    "/.gitignore",
+    "/.github/*",
+    "/benchmark/*",
+    "/img/*",
+]
 
 [dependencies]
-fnv = "1.0"
-rayon = { version = "1.5", optional = true }
+hashbrown = { version="0.11.2", features=["rayon"] }
+rayon = { version="1.5.1", optional=true }
 
 [dev-dependencies]
-rand = { version = "0.8", features = ["std_rng"] }
+rand = { version="0.8.4", features=["std_rng"] }
+profiling = { version="1.0.3", features=["profile-with-optick"] }
+criterion = "0.3.4"
+
+[[bench]]
+name = "my_benchmark"
+harness = false
+
 
 [features]
 default = ["rayon"]

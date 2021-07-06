@@ -395,8 +395,8 @@
 
 type Point = (usize, usize);
 
-type PointMap<V> = std::collections::HashMap<Point, V, fnv::FnvBuildHasher>;
-type PointSet = std::collections::HashSet<Point, fnv::FnvBuildHasher>;
+type PointMap<V> = hashbrown::HashMap<Point, V>;
+type PointSet = hashbrown::HashSet<Point>;
 
 mod path_cache;
 pub use self::path_cache::{PathCache, PathCacheConfig};
