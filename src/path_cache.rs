@@ -886,7 +886,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         for (&cp, sides) in renew.iter() {
             let mut candidates = PointSet::default();
             let chunk_index = self.get_chunk_index(cp);
-            let chunk = get_chunk_mut!(self, chunk_index);
+            let chunk = get_chunk!(self, chunk_index);
 
             for dir in Dir::all() {
                 if sides[dir.num()] != Renew::No {
@@ -900,9 +900,11 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 }
             }
 
-            for node in self.nodes.values() {
-                candidates.remove(&node.pos);
-            }
+            let candidates: PointSet = candidates
+                .iter()
+                .filter(|&&pos| self.nodes.id_at(pos).is_none())
+                .map(|&a| a)
+                .collect();
 
             if candidates.is_empty() {
                 continue;
@@ -913,6 +915,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 .into_iter()
                 .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
                 .to_vec();
+
+            let chunk = get_chunk_mut!(self, chunk_index);
 
             if !dirty.contains_key(&cp) {
                 chunk.add_nodes(
