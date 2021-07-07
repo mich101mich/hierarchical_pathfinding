@@ -900,11 +900,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 }
             }
 
-            let candidates: PointSet = candidates
-                .iter()
-                .filter(|&&pos| self.nodes.id_at(pos).is_none())
-                .map(|&a| a)
-                .collect();
+            // Only include nodes that aren't already part of the map
+            candidates.retain(|&pos| self.nodes.id_at(pos).is_none());
 
             if candidates.is_empty() {
                 continue;
@@ -1093,11 +1090,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             }
 
             // Only include nodes that aren't already part of the map
-            let candidates: PointSet = candidates
-                .iter()
-                .filter(|&&pos| self.nodes.id_at(pos).is_none())
-                .map(|&a| a)
-                .collect();
+            candidates.retain(|&pos| self.nodes.id_at(pos).is_none());
 
             if candidates.is_empty() {
                 continue;
