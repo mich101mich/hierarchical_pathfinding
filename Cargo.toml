@@ -19,7 +19,7 @@ exclude = [
 ]
 
 [dependencies]
-hashbrown = { version="0.11.2", features=["rayon"] }
+hashbrown = "0.11.2"
 rayon = { version="1.5.1", optional=true }
 
 [dev-dependencies]
@@ -33,4 +33,5 @@ harness = false
 
 
 [features]
-default = ["rayon"]
+default = ["parallel"]
+parallel = ["rayon", "hashbrown/rayon"]

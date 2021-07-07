@@ -957,7 +957,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// Same as [`tiles_changed`](PathCache::tiles_changed), but uses multiple threads.
     ///
     /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     pub fn tiles_changed_parallel<F: Sync + Fn(Point) -> isize>(
         &mut self,
         tiles: &[Point],
@@ -1486,6 +1486,7 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
+    #[cfg(feature = "parallel")]
     fn new_parallel() {
         let grid = [
             [0, 2, 0, 0, 0],
@@ -1532,7 +1533,7 @@ mod tests {
         fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Fn((usize, usize)) -> isize {
             move |(x, y)| [1, 10, -1][grid[y][x]]
         }
-        let pathfinding = PathCache::new_parallel(
+        let pathfinding = PathCache::new(
             (width, height),
             cost_fn(&grid),
             ManhattanNeighborhood::new(width, height),
@@ -1559,6 +1560,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "parallel")]
     fn update_path_parallel() {
         let mut grid = [
             [0, 2, 0, 0, 0],
@@ -1612,6 +1614,7 @@ mod tests {
 
     #[allow(unused)]
     // #[test]
+    #[cfg(feature = "parallel")]
     fn random_test() {
         use rand::prelude::*;
         use rayon::prelude::*;

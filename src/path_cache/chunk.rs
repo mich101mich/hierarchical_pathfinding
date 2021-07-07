@@ -210,10 +210,11 @@ impl Chunk {
         }
     }
 
-    pub fn add_nodes_parallel<N: Neighborhood + Sync>(
+    #[cfg(feature = "parallel")]
+    pub fn add_nodes_parallel<N: Neighborhood + Sync, F1: Fn(Point) -> isize + Sync>(
         &mut self,
         mut to_visit: Vec<NodeID>,
-        mut get_cost: impl FnMut(Point) -> isize,
+        get_cost: F1,
         neighborhood: &N,
         all_nodes: &NodeMap,
     ) -> HashMap<u32, HashMap<(usize, usize), Path<(usize, usize)>>> {
