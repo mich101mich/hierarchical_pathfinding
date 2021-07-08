@@ -27,6 +27,7 @@ pub struct PathCache<N: Neighborhood> {
     width: usize,
     height: usize,
     chunks: Vec<Chunk>,
+    num_chunks: (usize, usize),
     nodes: NodeMap,
     neighborhood: N,
     config: PathCacheConfig,
@@ -223,6 +224,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             width,
             height,
             chunks,
+            num_chunks: (num_chunks_w, num_chunks_h),
             nodes,
             neighborhood,
             config,
@@ -1244,14 +1246,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
     fn get_chunk_index(&self, point: Point) -> usize {
         let size = self.config.chunk_size;
-
         let (x, y) = ((point.0 / size), (point.1 / size));
-        let chunk_count_x = match self.width % size {
-            0 => self.width / size,
-            _ => (self.width / size) + 1,
-        };
-
-        y * chunk_count_x + x
+        y * self.num_chunks.0 + x
     }
 
     fn same_chunk(&self, a: Point, b: Point) -> bool {
