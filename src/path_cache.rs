@@ -32,18 +32,6 @@ pub struct PathCache<N: Neighborhood> {
     config: PathCacheConfig,
 }
 
-// this is a macro so that it only borrows self.chunks instead of self
-macro_rules! get_chunk {
-    ($obj: ident, $index: ident) => {
-        &$obj.chunks[$index]
-    };
-}
-macro_rules! get_chunk_mut {
-    ($obj: ident, $index: ident) => {
-        &mut $obj.chunks[$index]
-    };
-}
-
 impl<N: Neighborhood + Sync> PathCache<N> {
     /// Creates a new PathCache
     ///
@@ -865,7 +853,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             };
 
             let chunk_index = self.get_chunk_index(cp);
-            let chunk = get_chunk_mut!(self, chunk_index);
+            let chunk = &mut self.chunks[chunk_index];
 
             for id in removed {
                 chunk.nodes.remove(&id);
@@ -876,7 +864,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         // remove all Paths in changed chunks
         for cp in dirty.keys() {
             let chunk_index = self.get_chunk_index(*cp);
-            let chunk = get_chunk!(self, chunk_index);
+            let chunk = &self.chunks[chunk_index];
             for id in chunk.nodes.iter() {
                 self.nodes[*id].edges.clear();
             }
@@ -885,8 +873,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         // recreate sides in renew
         for (&cp, sides) in renew.iter() {
             let mut candidates = PointSet::default();
-            let chunk_index = self.get_chunk_index(cp);
-            let chunk = get_chunk!(self, chunk_index);
+            let chunk = self.get_chunk(cp);
 
             for dir in Dir::all() {
                 if sides[dir.num()] != Renew::No {
@@ -913,7 +900,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
                 .to_vec();
 
-            let chunk = get_chunk_mut!(self, chunk_index);
+            let chunk_index = self.get_chunk_index(cp);
+            let chunk = &mut self.chunks[chunk_index];
 
             if !dirty.contains_key(&cp) {
                 chunk.add_nodes(
@@ -933,7 +921,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         // recreate Paths
         for cp in dirty.keys() {
             let chunk_index = self.get_chunk_index(*cp);
-            let chunk = get_chunk_mut!(self, chunk_index);
+            let chunk = &mut self.chunks[chunk_index];
             let nodes = chunk.nodes.iter().copied().to_vec();
             chunk.nodes.clear();
 
@@ -1048,7 +1036,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             };
 
             let chunk_index = self.get_chunk_index(cp);
-            let chunk = get_chunk_mut!(self, chunk_index);
+            let chunk = &mut self.chunks[chunk_index];
 
             for id in removed {
                 chunk.nodes.remove(&id);
@@ -1064,7 +1052,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         // remove all Paths in changed chunks
         for cp in dirty.keys() {
             let chunk_index = self.get_chunk_index(*cp);
-            let chunk = get_chunk!(self, chunk_index);
+            let chunk = &self.chunks[chunk_index];
             for id in chunk.nodes.iter() {
                 self.nodes[*id].edges.clear();
             }
@@ -1075,7 +1063,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         for (&cp, sides) in renew.iter() {
             let mut candidates = PointSet::default();
             let chunk_index = self.get_chunk_index(cp);
-            let chunk = get_chunk!(self, chunk_index);
+            let chunk = &self.chunks[chunk_index];
 
             for dir in Dir::all() {
                 if sides[dir.num()] != Renew::No {
@@ -1103,7 +1091,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 .to_vec();
 
             if !dirty.contains_key(&cp) {
-                let chunk = get_chunk_mut!(self, chunk_index);
+                let chunk = &mut self.chunks[chunk_index];
                 chunk.add_nodes(
                     nodes,
                     &get_cost,
@@ -1113,7 +1101,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 );
             } else {
                 for id in nodes {
-                    let chunk = get_chunk_mut!(self, chunk_index);
+                    let chunk = &mut self.chunks[chunk_index];
                     chunk.nodes.insert(id);
                 }
             }
@@ -1251,7 +1239,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
     fn get_chunk(&self, point: Point) -> &Chunk {
         let index = self.get_chunk_index(point);
-        get_chunk!(self, index)
+        &self.chunks[index]
     }
 
     fn get_chunk_index(&self, point: Point) -> usize {
