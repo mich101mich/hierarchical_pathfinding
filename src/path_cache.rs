@@ -1,5 +1,5 @@
 use crate::{
-    graph::{self, Node, NodeID, NodeIDMap, NodeMap},
+    graph::{self, Node, NodeID, NodeIDMap, NodeIDSet, NodeMap},
     neighbors::Neighborhood,
     path::{AbstractPath, Cost, Path, PathSegment},
     *,
@@ -233,7 +233,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         };
 
         // connect neighboring Nodes across Chunk borders
-        cache.connect_nodes();
+        cache.connect_nodes(None);
 
         cache
     }
@@ -882,6 +882,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         re_trace!("establish renew", timer);
 
+        let mut changed_nodes = NodeIDSet::default();
+
         // remove all nodes of sides in renew
         for (&cp, sides) in renew.iter() {
             let chunk_index = self.get_chunk_index(cp);
@@ -964,6 +966,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
                 let chunk = &mut self.chunks[chunk_index];
                 if !dirty.contains_key(&cp) {
+                    for node in nodes.iter() {
+                        changed_nodes.insert(*node);
+                    }
                     chunk.add_nodes(
                         &nodes,
                         &mut get_cost,
@@ -987,6 +992,10 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                     let chunk_index = self.get_chunk_index(*cp);
                     let chunk = &mut self.chunks[chunk_index];
                     let nodes = chunk.nodes.iter().copied().to_vec();
+
+                    for node in nodes.iter() {
+                        changed_nodes.insert(*node);
+                    }
 
                     chunk.nodes.clear();
                     chunk.add_nodes(
@@ -1035,12 +1044,18 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                     self.nodes.add_edge(id, other_id, path);
                 }
 
+                for chunk_index in dirty_indices.iter() {
+                    for node in self.chunks[*chunk_index].nodes.iter() {
+                        changed_nodes.insert(*node);
+                    }
+                }
+
                 re_trace!("update edges", timer);
             }
         }
 
         // re-establish cross-chunk connections
-        self.connect_nodes();
+        self.connect_nodes(Some(changed_nodes));
 
         re_trace!("connect nodes", timer);
         trace!("total time: {:?}", std::time::Instant::now() - outer_timer);
@@ -1227,8 +1242,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         ret
     }
 
-    fn connect_nodes(&mut self) {
-        let ids = self.nodes.keys().to_vec();
+    fn connect_nodes(&mut self, ids: Option<NodeIDSet>) {
+        let ids = ids.unwrap_or_else(|| self.nodes.keys().collect());
         let mut target = vec![];
         for id in ids {
             let (pos, cost) = {
