@@ -237,7 +237,7 @@ impl Chunk {
                 .pop()
                 .expect("Internal Error #4 in Chunk. Please report this");
 
-            let paths = self.find_paths(point, &points, &mut get_cost, neighborhood);
+            let paths = self.find_paths(point, &points, &get_cost, neighborhood);
 
             all_paths.insert(id, paths);
         }

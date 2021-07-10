@@ -72,6 +72,7 @@ impl NodeMap {
             .filter(|(_, opt)| opt.is_some())
             .map(|(id, _)| id as NodeID)
     }
+    #[allow(unused)]
     pub fn values(&self) -> impl Iterator<Item = &Node> + '_ {
         self.nodes.iter().filter_map(|opt| opt.as_ref())
     }
