@@ -5,6 +5,8 @@ use crate::{
     *,
 };
 
+use log::info;
+
 mod cache_config;
 pub use cache_config::PathCacheConfig;
 
@@ -952,10 +954,10 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ) {
         use hashbrown::HashMap;
         use rayon::prelude::*;
+        use std::time::Instant;
 
         let size = self.config.chunk_size;
 
-        use std::time::Instant;
         let outer_timer = Instant::now();
 
         let mut dirty = PointMap::default();
@@ -1046,7 +1048,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             }
         }
 
-        println!(
+        info!(
             "time to remove nodes of sides in renew: {:?}",
             Instant::now() - timer
         );
@@ -1109,7 +1111,10 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             }
         }
 
-        println!("time to recreates sides: {:?}", Instant::now() - timer);
+        info!(
+            "time to recreates sides in renew: {:?}",
+            Instant::now() - timer
+        );
 
         let timer = Instant::now();
 
@@ -1138,7 +1143,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 .collect()
         };
 
-        println!("time to get paths: {:?}", Instant::now() - mid_timer);
+        info!("time to get paths: {:?}", Instant::now() - mid_timer);
 
         let inner_timer = Instant::now();
 
@@ -1161,15 +1166,15 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         println!("time to update edges: {:?}", Instant::now() - inner_timer);
 
-        println!("time to recreate paths renew: {:?}", Instant::now() - timer);
+        info!("time to recreate paths renew: {:?}", Instant::now() - timer);
 
         // let timer = Instant::now();
 
         // re-establish cross-chunk connections
         self.connect_nodes();
 
-        // println!("time to connect nodes: {:?}", Instant::now() - timer);
-        println!("total time: {:?}", Instant::now() - outer_timer);
+        // info!("time to connect nodes: {:?}", Instant::now() - timer);
+        info!("total time: {:?}", Instant::now() - outer_timer);
     }
 
     /// Allows for debugging and visualizing the PathCache
