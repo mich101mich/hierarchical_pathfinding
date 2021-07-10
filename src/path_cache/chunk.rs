@@ -1,7 +1,5 @@
-use hashbrown::HashMap;
-
 use crate::{
-    graph::{NodeID, NodeIDSet, NodeMap},
+    graph::*,
     neighbors::Neighborhood,
     path::{Path, PathSegment},
     *,
@@ -52,7 +50,7 @@ impl Chunk {
             .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
             .to_vec();
 
-        chunk.add_nodes(nodes, &mut get_cost, neighborhood, all_nodes, &config);
+        chunk.add_nodes(&nodes, &mut get_cost, neighborhood, all_nodes, &config);
 
         chunk
     }
@@ -175,16 +173,16 @@ impl Chunk {
 
     pub fn add_nodes<N: Neighborhood>(
         &mut self,
-        mut to_visit: Vec<NodeID>,
+        to_visit: &[NodeID],
         mut get_cost: impl FnMut(Point) -> isize,
         neighborhood: &N,
         all_nodes: &mut NodeMap,
         config: &PathCacheConfig,
     ) {
-        let mut points = self
-            .nodes
+        // first to_visit, then the rest => slicing works the same on both lists
+        let points = to_visit
             .iter()
-            .chain(to_visit.iter()) // results in to_visit points at the end => enables pop()
+            .chain(self.nodes.iter())
             .map(|id| all_nodes[*id].pos)
             .to_vec();
 
@@ -192,14 +190,10 @@ impl Chunk {
             self.nodes.insert(id);
         }
 
-        // connect every Node to every other Node
-        while let Some(id) = to_visit.pop() {
-            let point = points
-                .pop()
-                .expect("Internal Error #4 in Chunk. Please report this");
-
-            let paths = self.find_paths(point, &points, &mut get_cost, neighborhood);
-
+        for (i, &id) in to_visit.iter().enumerate() {
+            let point = points[i];
+            let remaining = &points[(i + 1)..];
+            let paths = self.find_paths(point, remaining, &mut get_cost, neighborhood);
             for (other_pos, path) in paths {
                 let other_id = all_nodes
                     .id_at(other_pos)
@@ -211,38 +205,38 @@ impl Chunk {
     }
 
     #[cfg(feature = "parallel")]
-    pub fn add_nodes_parallel<N: Neighborhood + Sync, F1: Fn(Point) -> isize + Sync>(
-        &mut self,
-        mut to_visit: Vec<NodeID>,
+    pub fn connect_nodes_parallel<N: Neighborhood + Sync, F1: Fn(Point) -> isize + Sync>(
+        &self,
         get_cost: F1,
         neighborhood: &N,
         all_nodes: &NodeMap,
-    ) -> HashMap<u32, HashMap<(usize, usize), Path<(usize, usize)>>> {
-        let mut points = self
-            .nodes
-            .iter()
-            .chain(to_visit.iter()) // results in to_visit points at the end => enables pop()
-            .map(|id| all_nodes[*id].pos)
-            .to_vec();
+        cache_paths: bool,
+    ) -> Vec<(NodeID, NodeID, PathSegment)> {
+        use rayon::prelude::*;
 
-        for &id in to_visit.iter() {
-            self.nodes.insert(id);
+        let mut ids = Vec::with_capacity(self.nodes.len());
+        let mut points = Vec::with_capacity(self.nodes.len());
+        for (i, &id) in self.nodes.iter().enumerate() {
+            ids.push((i, id));
+            points.push(all_nodes[id].pos);
         }
-
-        let mut all_paths = HashMap::new();
 
         // connect every Node to every other Node
-        while let Some(id) = to_visit.pop() {
-            let point = points
-                .pop()
-                .expect("Internal Error #4 in Chunk. Please report this");
+        ids.par_iter()
+            .flat_map(|&(i, id)| {
+                let point = points[i];
+                let remaining = &points[(i + 1)..];
+                self.find_paths(point, remaining, &get_cost, neighborhood)
+                    .into_par_iter()
+                    .map(move |(other_pos, path)| {
+                        let other_id = all_nodes
+                            .id_at(other_pos)
+                            .expect("Internal Error #5 in Chunk. Please report this");
 
-            let paths = self.find_paths(point, &points, &get_cost, neighborhood);
-
-            all_paths.insert(id, paths);
-        }
-
-        all_paths
+                        (id, other_id, PathSegment::new(path, cache_paths))
+                    })
+            })
+            .collect()
     }
 
     pub fn find_paths<N: Neighborhood>(

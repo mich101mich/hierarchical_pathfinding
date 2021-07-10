@@ -94,7 +94,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// Same as [`new`](PathCache::new), but uses multiple threads.
     ///
     /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     pub fn new_parallel<F: Sync + Fn(Point) -> isize>(
         (width, height): (usize, usize),
         get_cost: F,
@@ -172,9 +172,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 }
                 chunks
             }
-            #[cfg(not(feature = "rayon"))]
+            #[cfg(not(feature = "parallel"))]
             _ => panic!("Created a Parallel CostFnWrapper in a non-parallel environment"),
-            #[cfg(feature = "rayon")]
+            #[cfg(feature = "parallel")]
             CostFnWrapper::Parallel(get_cost) => {
                 use rayon::prelude::*;
 
@@ -776,171 +776,11 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// let path = pathfinding.find_path(start, goal, cost_fn(&grid));
     /// assert!(path.is_some());
     /// ```
-    pub fn tiles_changed(&mut self, tiles: &[Point], mut get_cost: impl FnMut(Point) -> isize) {
-        let size = self.config.chunk_size;
-
-        let mut dirty = PointMap::default();
-        for &p in tiles {
-            let chunk_pos = self.get_chunk_pos(p);
-            dirty.entry(chunk_pos).or_insert_with(Vec::new).push(p);
-        }
-
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        enum Renew {
-            No,
-            Inner,
-            Corner(Point),
-            All,
-        }
-
-        // map of chunk_pos => array: [Renew; 4] where array[side] says if chunk[side] needs to be renewed
-        let mut renew = PointMap::default();
-
-        for (&cp, positions) in dirty.iter() {
-            let chunk = self.get_chunk(cp);
-            // for every changed tile in the chunk
-            for &p in positions {
-                // check every side that this tile is on
-                for dir in Dir::all().filter(|dir| chunk.sides[dir.num()] && chunk.at_side(p, *dir))
-                {
-                    // if there is a chunk in that direction
-                    let other_pos = jump_in_dir(cp, dir, size, (0, 0), (self.width, self.height))
-                        .expect("Internal Error #2 in PathCache. Please report this");
-
-                    // mark the current and other side
-                    let own = &mut renew.entry(cp).or_insert([Renew::No; 4])[dir.num()];
-                    let old = *own;
-                    if chunk.is_corner(p) {
-                        if old == Renew::No || old == Renew::Inner {
-                            *own = Renew::Corner(p);
-                        } else if let Renew::Corner(p2) = old {
-                            if p2 != p {
-                                *own = Renew::All;
-                            }
-                        } else if old != Renew::All {
-                            *own = Renew::Corner(p)
-                        }
-                    } else {
-                        // All > Corner > Inner > No, and we don't want to override anything greater than Inner
-                        if *own == Renew::No {
-                            *own = Renew::Inner;
-                        }
-                    }
-                    let other =
-                        &mut renew.entry(other_pos).or_insert([Renew::No; 4])[dir.opposite().num()];
-                    if *other == Renew::No {
-                        *other = Renew::Inner;
-                    }
-                }
-            }
-        }
-
-        // remove all nodes of sides in renew
-        for (&cp, sides) in renew.iter() {
-            let removed = {
-                let chunk = self.get_chunk(cp);
-                chunk
-                    .nodes
-                    .iter()
-                    .filter(|id| {
-                        let pos = self.nodes[**id].pos;
-                        let corner = chunk.is_corner(pos);
-                        Dir::all().any(|dir| match sides[dir.num()] {
-                            Renew::No => false,
-                            Renew::Inner => !corner,
-                            Renew::Corner(c) => !corner || c == pos,
-                            Renew::All => true,
-                        } && chunk.at_side(pos, dir))
-                    })
-                    .copied()
-                    .to_vec()
-            };
-
-            let chunk_index = self.get_chunk_index(cp);
-            let chunk = &mut self.chunks[chunk_index];
-
-            for id in removed {
-                chunk.nodes.remove(&id);
-                self.nodes.remove_node(id);
-            }
-        }
-
-        // remove all Paths in changed chunks
-        for cp in dirty.keys() {
-            let chunk_index = self.get_chunk_index(*cp);
-            let chunk = &self.chunks[chunk_index];
-            for id in chunk.nodes.iter() {
-                self.nodes[*id].edges.clear();
-            }
-        }
-
-        // recreate sides in renew
-        for (&cp, sides) in renew.iter() {
-            let mut candidates = PointSet::default();
-            let chunk = self.get_chunk(cp);
-
-            for dir in Dir::all() {
-                if sides[dir.num()] != Renew::No {
-                    chunk.calculate_side_nodes(
-                        dir,
-                        (self.width, self.height),
-                        &mut get_cost,
-                        self.config,
-                        &mut candidates,
-                    );
-                }
-            }
-
-            // Only include nodes that aren't already part of the map
-            candidates.retain(|&pos| self.nodes.id_at(pos).is_none());
-
-            if candidates.is_empty() {
-                continue;
-            }
-
-            let all_nodes = &mut self.nodes;
-            let nodes = candidates
-                .into_iter()
-                .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
-                .to_vec();
-
-            let chunk_index = self.get_chunk_index(cp);
-            let chunk = &mut self.chunks[chunk_index];
-
-            if !dirty.contains_key(&cp) {
-                chunk.add_nodes(
-                    nodes,
-                    &mut get_cost,
-                    &self.neighborhood,
-                    &mut self.nodes,
-                    &self.config,
-                );
-            } else {
-                for id in nodes {
-                    chunk.nodes.insert(id);
-                }
-            }
-        }
-
-        // recreate Paths
-        for cp in dirty.keys() {
-            let chunk_index = self.get_chunk_index(*cp);
-            let chunk = &mut self.chunks[chunk_index];
-            let nodes = chunk.nodes.iter().copied().to_vec();
-            chunk.nodes.clear();
-
-            chunk.add_nodes(
-                nodes,
-                &mut get_cost,
-                &self.neighborhood,
-                &mut self.nodes,
-                &self.config,
-            );
-        }
-
-
-        // re-establish cross-chunk connections
-        self.connect_nodes();
+    pub fn tiles_changed<F: FnMut(Point) -> isize>(&mut self, tiles: &[Point], get_cost: F) {
+        self.tiles_changed_internal::<fn(Point) -> isize, F>(
+            tiles,
+            CostFnWrapper::Sequential(get_cost),
+        )
     }
 
     /// Same as [`tiles_changed`](PathCache::tiles_changed), but uses multiple threads.
@@ -952,13 +792,37 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         tiles: &[Point],
         get_cost: F,
     ) {
-        use hashbrown::HashMap;
-        use rayon::prelude::*;
-        use std::time::Instant;
+        self.tiles_changed_internal::<F, fn(Point) -> isize>(
+            tiles,
+            CostFnWrapper::Parallel(get_cost),
+        )
+    }
 
+    /// Same as [`tiles_changed`](PathCache::tiles_changed), but uses multiple threads.
+    ///
+    /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
+    fn tiles_changed_internal<F1, F2>(
+        &mut self,
+        tiles: &[Point],
+        mut get_cost: CostFnWrapper<F1, F2>,
+    ) where
+        F1: Sync + Fn(Point) -> isize,
+        F2: FnMut(Point) -> isize,
+    {
         let size = self.config.chunk_size;
 
-        let outer_timer = Instant::now();
+        let outer_timer = std::time::Instant::now();
+        let mut timer = outer_timer;
+        macro_rules! re_trace {
+            ($msg: literal, $timer: ident) => {
+                let now = std::time::Instant::now();
+                trace!(concat!("time to ", $msg, ": {:?}"), now - $timer);
+                #[allow(unused_assignments)]
+                {
+                    $timer = now;
+                }
+            };
+        }
 
         let mut dirty = PointMap::default();
         for &p in tiles {
@@ -1016,42 +880,38 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             }
         }
 
-        let timer = Instant::now();
+        re_trace!("establish renew", timer);
 
         // remove all nodes of sides in renew
         for (&cp, sides) in renew.iter() {
-            let removed = {
-                let chunk = self.get_chunk(cp);
-                chunk
-                    .nodes
-                    .iter()
-                    .filter(|id| {
-                        let pos = self.nodes[**id].pos;
-                        let corner = chunk.is_corner(pos);
-                        Dir::all().any(|dir| match sides[dir.num()] {
+            let chunk_index = self.get_chunk_index(cp);
+
+            let chunk = &self.chunks[chunk_index];
+            let removed = chunk
+                .nodes
+                .iter()
+                .filter(|id| {
+                    let pos = self.nodes[**id].pos;
+                    let corner = chunk.is_corner(pos);
+                    Dir::all().any(|dir| match sides[dir.num()] {
                             Renew::No => false,
                             Renew::Inner => !corner,
                             Renew::Corner(c) => !corner || c == pos,
                             Renew::All => true,
                         } && chunk.at_side(pos, dir))
-                    })
-                    .copied()
-                    .to_vec()
-            };
+                })
+                .copied()
+                .to_vec();
 
-            let chunk_index = self.get_chunk_index(cp);
             let chunk = &mut self.chunks[chunk_index];
 
             for id in removed {
                 chunk.nodes.remove(&id);
-                self.nodes.remove_node(id); // This is where the majority of time is spent here
+                self.nodes.remove_node(id);
             }
         }
 
-        trace!(
-            "time to remove nodes of sides in renew: {:?}",
-            Instant::now() - timer
-        );
+        re_trace!("remove nodes of sides in renew", timer);
 
         // remove all Paths in changed chunks
         for cp in dirty.keys() {
@@ -1062,119 +922,128 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             }
         }
 
-        let timer = Instant::now();
-        // recreate sides in renew
-        for (&cp, sides) in renew.iter() {
-            let mut candidates = PointSet::default();
-            let chunk_index = self.get_chunk_index(cp);
-            let chunk = &self.chunks[chunk_index];
+        {
+            let mut get_cost: &mut dyn FnMut(Point) -> isize = match &mut get_cost {
+                CostFnWrapper::Sequential(get_cost) => get_cost,
+                #[cfg(feature = "parallel")]
+                CostFnWrapper::Parallel(get_cost) => get_cost,
+                #[cfg(not(feature = "parallel"))]
+                _ => panic!("Created a Parallel CostFnWrapper in a non-parallel environment"),
+            };
 
-            for dir in Dir::all() {
-                if sides[dir.num()] != Renew::No {
-                    chunk.calculate_side_nodes(
-                        dir,
-                        (self.width, self.height),
-                        &get_cost,
-                        self.config,
-                        &mut candidates,
-                    );
+            // recreate sides in renew
+            for (&cp, sides) in renew.iter() {
+                let mut candidates = PointSet::default();
+                let chunk_index = self.get_chunk_index(cp);
+                let chunk = &self.chunks[chunk_index];
+
+                for dir in Dir::all() {
+                    if sides[dir.num()] != Renew::No {
+                        chunk.calculate_side_nodes(
+                            dir,
+                            (self.width, self.height),
+                            &mut get_cost,
+                            self.config,
+                            &mut candidates,
+                        );
+                    }
                 }
-            }
 
-            // Only include nodes that aren't already part of the map
-            candidates.retain(|&pos| self.nodes.id_at(pos).is_none());
+                // Only include nodes that aren't already part of the map
+                candidates.retain(|&pos| self.nodes.id_at(pos).is_none());
 
-            if candidates.is_empty() {
-                continue;
-            }
+                if candidates.is_empty() {
+                    continue;
+                }
 
-            let all_nodes = &mut self.nodes;
-            let nodes = candidates
-                .into_iter()
-                .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
-                .to_vec();
+                let all_nodes = &mut self.nodes;
+                let nodes = candidates
+                    .into_iter()
+                    .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
+                    .to_vec();
 
-            if !dirty.contains_key(&cp) {
                 let chunk = &mut self.chunks[chunk_index];
-                chunk.add_nodes(
-                    nodes,
-                    &get_cost,
-                    &self.neighborhood,
-                    &mut self.nodes,
-                    &self.config,
-                );
-            } else {
-                for id in nodes {
-                    let chunk = &mut self.chunks[chunk_index];
-                    chunk.nodes.insert(id);
+                if !dirty.contains_key(&cp) {
+                    chunk.add_nodes(
+                        &nodes,
+                        &mut get_cost,
+                        &self.neighborhood,
+                        &mut self.nodes,
+                        &self.config,
+                    );
+                } else {
+                    for id in nodes {
+                        chunk.nodes.insert(id);
+                    }
                 }
             }
         }
 
-        trace!(
-            "time to recreates sides in renew: {:?}",
-            Instant::now() - timer
-        );
+        re_trace!("recreates sides in renew", timer);
 
-        let timer = Instant::now();
-
-        let dirty_indices: hashbrown::HashSet<usize> = dirty
-            .keys()
-            .map(|(x, y)| self.get_chunk_index((*x, *y)))
-            .collect();
-
-        let mid_timer = Instant::now();
-
-        let paths: Vec<_> = {
-            use std::sync::Arc;
-            let neighborhood = Arc::new(&self.neighborhood);
-            let all_nodes = Arc::new(&self.nodes);
-
-            self.chunks
-                .par_iter_mut()
-                .enumerate()
-                .filter(|(index, _chunk)| dirty_indices.contains(index))
-                .map(|(_index, chunk)| {
+        match get_cost {
+            CostFnWrapper::Sequential(mut get_cost) => {
+                for cp in dirty.keys() {
+                    let chunk_index = self.get_chunk_index(*cp);
+                    let chunk = &mut self.chunks[chunk_index];
                     let nodes = chunk.nodes.iter().copied().to_vec();
+
                     chunk.nodes.clear();
-
-                    chunk.add_nodes_parallel(nodes, &get_cost, *neighborhood, &all_nodes)
-                })
-                .collect()
-        };
-
-        trace!("time to get paths: {:?}", Instant::now() - mid_timer);
-
-        let inner_timer = Instant::now();
-
-        for thing in paths {
-            for (id, thing2) in thing {
-                for (other_pos, path) in thing2 {
-                    let other_id = self
-                        .nodes
-                        .id_at(other_pos)
-                        .expect("Internal Error #5 in Chunk. Please report this");
-
-                    self.nodes.add_edge(
-                        id,
-                        other_id,
-                        PathSegment::new(path, self.config.cache_paths),
+                    chunk.add_nodes(
+                        &nodes,
+                        &mut get_cost,
+                        &self.neighborhood,
+                        &mut self.nodes,
+                        &self.config,
                     );
                 }
+                re_trace!("recreate Paths", timer);
+            }
+            #[cfg(not(feature = "parallel"))]
+            _ => panic!("Created a Parallel CostFnWrapper in a non-parallel environment"),
+            #[cfg(feature = "parallel")]
+            CostFnWrapper::Parallel(get_cost) => {
+                use rayon::prelude::*;
+                let dirty_indices: hashbrown::HashSet<usize> = dirty
+                    .keys()
+                    .map(|(x, y)| self.get_chunk_index((*x, *y)))
+                    .collect();
+
+                let paths: Vec<_> = {
+                    let neighborhood = &self.neighborhood;
+                    let all_nodes = &self.nodes;
+                    let cache_paths = self.config.cache_paths;
+
+                    self.chunks
+                        .par_iter()
+                        .enumerate()
+                        .filter(|(chunk_index, _)| dirty_indices.contains(chunk_index))
+                        .map(|(_, chunk)| {
+                            chunk.connect_nodes_parallel(
+                                &get_cost,
+                                neighborhood,
+                                all_nodes,
+                                cache_paths,
+                            )
+                        })
+                        .collect()
+                };
+
+                re_trace!("get paths", timer);
+
+                for (id, other_id, path) in paths.into_iter().flatten() {
+                    self.nodes.add_edge(id, other_id, path);
+                }
+
+                re_trace!("update edges", timer);
             }
         }
-
-        println!("time to update edges: {:?}", Instant::now() - inner_timer);
-
-        trace!("time to recreate paths renew: {:?}", Instant::now() - timer);
-
-        // let timer = Instant::now();
 
         // re-establish cross-chunk connections
         self.connect_nodes();
 
-        // trace!("time to connect nodes: {:?}", Instant::now() - timer);
-        trace!("total time: {:?}", Instant::now() - outer_timer);
+        re_trace!("connect nodes", timer);
+        trace!("total time: {:?}", std::time::Instant::now() - outer_timer);
     }
 
     /// Allows for debugging and visualizing the PathCache
@@ -1623,11 +1492,8 @@ mod tests {
         let path = pathfinding.find_path(start, goal, cost_fn(&grid));
         assert!(path.is_some());
 
-        let mut changed_tiles: Vec<(usize, usize)> = Vec::with_capacity(grid.len());
-        for y in 0..grid.len() {
-            grid[y][2] = 2;
-            changed_tiles.push((2, y));
-        }
+        let changed_tiles: Vec<_> = (0..grid.len()).map(|y| (2, y)).collect();
+        grid.iter_mut().for_each(|row| row[2] = 2);
         #[cfg(feature = "parallel")]
         pathfinding.tiles_changed_parallel(&changed_tiles, cost_fn(&grid));
         #[cfg(not(feature = "parallel"))]
