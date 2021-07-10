@@ -5,7 +5,7 @@ use crate::{
     *,
 };
 
-use log::info;
+use log::trace;
 
 mod cache_config;
 pub use cache_config::PathCacheConfig;
@@ -1048,7 +1048,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             }
         }
 
-        info!(
+        trace!(
             "time to remove nodes of sides in renew: {:?}",
             Instant::now() - timer
         );
@@ -1111,7 +1111,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             }
         }
 
-        info!(
+        trace!(
             "time to recreates sides in renew: {:?}",
             Instant::now() - timer
         );
@@ -1125,7 +1125,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         let mid_timer = Instant::now();
 
-        let paths: Vec<HashMap<u32, HashMap<(usize, usize), Path<(usize, usize)>>>> = {
+        let paths: Vec<_> = {
             use std::sync::Arc;
             let neighborhood = Arc::new(&self.neighborhood);
             let all_nodes = Arc::new(&self.nodes);
@@ -1143,7 +1143,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 .collect()
         };
 
-        info!("time to get paths: {:?}", Instant::now() - mid_timer);
+        trace!("time to get paths: {:?}", Instant::now() - mid_timer);
 
         let inner_timer = Instant::now();
 
@@ -1166,15 +1166,15 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         println!("time to update edges: {:?}", Instant::now() - inner_timer);
 
-        info!("time to recreate paths renew: {:?}", Instant::now() - timer);
+        trace!("time to recreate paths renew: {:?}", Instant::now() - timer);
 
         // let timer = Instant::now();
 
         // re-establish cross-chunk connections
         self.connect_nodes();
 
-        // info!("time to connect nodes: {:?}", Instant::now() - timer);
-        info!("total time: {:?}", Instant::now() - outer_timer);
+        // trace!("time to connect nodes: {:?}", Instant::now() - timer);
+        trace!("total time: {:?}", Instant::now() - outer_timer);
     }
 
     /// Allows for debugging and visualizing the PathCache
