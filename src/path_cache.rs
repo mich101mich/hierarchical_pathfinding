@@ -1468,8 +1468,7 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
-    #[cfg(feature = "parallel")]
-    fn new_parallel() {
+    fn new() {
         let grid = [
             [0, 2, 0, 0, 0],
             [0, 2, 2, 2, 2],
@@ -1481,7 +1480,18 @@ mod tests {
         fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Fn((usize, usize)) -> isize {
             move |(x, y)| [1, 10, -1][grid[y][x]]
         }
+        #[cfg(feature = "parallel")]
         let pathfinding = PathCache::new_parallel(
+            (width, height),
+            cost_fn(&grid),
+            ManhattanNeighborhood::new(width, height),
+            PathCacheConfig {
+                chunk_size: 3,
+                ..Default::default()
+            },
+        );
+        #[cfg(not(feature = "parallel"))]
+        let pathfinding = PathCache::new(
             (width, height),
             cost_fn(&grid),
             ManhattanNeighborhood::new(width, height),
@@ -1542,8 +1552,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "parallel")]
-    fn update_path_parallel() {
+    fn update_path() {
         let mut grid = [
             [0, 2, 0, 0, 0],
             [0, 2, 2, 2, 2],
@@ -1556,7 +1565,19 @@ mod tests {
             move |(x, y)| [1, 10, -1][grid[y][x]]
         }
 
+        #[cfg(feature = "parallel")]
         let mut pathfinding = PathCache::new_parallel(
+            (width, height),
+            cost_fn(&grid),
+            MooreNeighborhood::new(width, height),
+            PathCacheConfig {
+                chunk_size: 3,
+                ..Default::default()
+            },
+        );
+
+        #[cfg(not(feature = "parallel"))]
+        let mut pathfinding = PathCache::new(
             (width, height),
             cost_fn(&grid),
             MooreNeighborhood::new(width, height),
@@ -1580,7 +1601,10 @@ mod tests {
         grid[2][1] = 0;
         let changed_tiles = [(1, 1)];
 
+        #[cfg(feature = "parallel")]
         pathfinding.tiles_changed_parallel(&changed_tiles, cost_fn(&grid));
+        #[cfg(not(feature = "parallel"))]
+        pathfinding.tiles_changed(&changed_tiles, cost_fn(&grid));
 
         let start = (0, 0);
         let goal = (4, 4);
@@ -1592,6 +1616,25 @@ mod tests {
             points,
             vec![(0, 1), (1, 2), (2, 2), (3, 2), (4, 3), (4, 4)],
         );
+
+        // Add a wall down the center
+        let start = (0, 0);
+        let goal = (3, 2);
+        let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+        assert!(path.is_some());
+
+        let mut changed_tiles: Vec<(usize, usize)> = Vec::with_capacity(grid.len());
+        for y in 0..grid.len() {
+            grid[y][2] = 2;
+            changed_tiles.push((2, y));
+        }
+        #[cfg(feature = "parallel")]
+        pathfinding.tiles_changed_parallel(&changed_tiles, cost_fn(&grid));
+        #[cfg(not(feature = "parallel"))]
+        pathfinding.tiles_changed(&changed_tiles, cost_fn(&grid));
+
+        let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+        assert!(path.is_none());
     }
 
     #[allow(unused)]
