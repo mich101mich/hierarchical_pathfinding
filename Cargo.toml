@@ -16,6 +16,7 @@ exclude = [
     "/.github/*",
     "/benchmark/*",
     "/img/*",
+    "/benches/*",
 ]
 
 [dependencies]
