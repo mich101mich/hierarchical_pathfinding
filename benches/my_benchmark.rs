@@ -97,7 +97,7 @@ fn bench_create_patchcache(c: &mut Criterion) {
             #[cfg(feature = "parallel")]
             {
                 let id = format!(
-                    "Uniform map, Parallel, Map Size: ({}, {}), Cache Size: {}",
+                    "Create cache, Uniform map, Parallel, Map Size: ({}, {}), Cache Size: {}",
                     width, height, chunk_size
                 );
                 group.bench_function(&id, |b| {
@@ -118,7 +118,7 @@ fn bench_create_patchcache(c: &mut Criterion) {
             #[cfg(not(feature = "parallel"))]
             {
                 let id = format!(
-                    "Single Threaded, Map Size: ({}, {}), Cache Size: {}",
+                    "Create cache, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
                     width, height, chunk_size
                 );
                 group.bench_function(&id, |b| {
@@ -148,7 +148,7 @@ fn bench_create_patchcache(c: &mut Criterion) {
     #[cfg(feature = "parallel")]
     {
         let id = format!(
-            "Large Random Map, Parallel, Map Size: ({}, {}), Cache Size: {}",
+            "Create cache, Large Random Map, Parallel, Map Size: ({}, {}), Cache Size: {}",
             width, height, chunk_size
         );
         group.bench_with_input(
@@ -172,7 +172,7 @@ fn bench_create_patchcache(c: &mut Criterion) {
     #[cfg(not(feature = "parallel"))]
     {
         let id = format!(
-            "Large Random Map, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
+            "Create cache, Large Random Map, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
             width, height, chunk_size
         );
         group.bench_function(&id, |b| {
@@ -235,7 +235,7 @@ fn bench_update_patchcache(c: &mut Criterion) {
     }
 
     let id = format!(
-        "Large Random Map, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
+        "Update cache, Large Random Map, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
         width, height, chunk_size
     );
     group.bench_function(&id, |b| {
@@ -244,10 +244,11 @@ fn bench_update_patchcache(c: &mut Criterion) {
         })
     });
 
+    // TODO: Remove this if/when tiles_changed_parallel is merged into tiles_changed
     #[cfg(feature = "parallel")]
     {
         let id = format!(
-            "Large Random Map, Parallel, Map Size: ({}, {}), Cache Size: {}",
+            "Update cache, Large Random Map, Parallel, Map Size: ({}, {}), Cache Size: {}",
             width, height, chunk_size
         );
         group.bench_function(&id, |b| {
@@ -286,7 +287,7 @@ fn bench_get_path(c: &mut Criterion) {
         },
     );
     let id = format!(
-        "Medium Uniform Map, Map Size: ({}, {}), Cache Size: {}",
+        "Get Single Path, Medium Uniform Map, Map Size: ({}, {}), Cache Size: {}",
         width, height, chunk_size
     );
     group.bench_function(&id, |b| {
@@ -322,7 +323,7 @@ fn bench_get_path(c: &mut Criterion) {
     );
 
     let id = format!(
-        "Medium Random Map, Map Size: ({}, {}), Cache Size: {}",
+        "Get Single Path, Medium Random Map, Map Size: ({}, {}), Cache Size: {}",
         width, height, chunk_size
     );
     group.bench_function(&id, |b| {
@@ -360,7 +361,7 @@ fn bench_get_path(c: &mut Criterion) {
     );
 
     let id = format!(
-        "Large Uniform Map, Map Size: ({}, {}), Cache Size: {}",
+        "Get Single Path, Large Uniform Map, Map Size: ({}, {}), Cache Size: {}",
         width, height, chunk_size
     );
     group.bench_function(&id, |b| {
@@ -395,7 +396,7 @@ fn bench_get_path(c: &mut Criterion) {
     );
 
     let id = format!(
-        "Large Random Map, Map Size: ({}, {}), Cache Size: {}",
+        "Get Single Path, Large Random Map, Map Size: ({}, {}), Cache Size: {}",
         width, height, chunk_size
     );
     group.bench_function(&id, |b| {
