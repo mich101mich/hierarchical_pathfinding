@@ -1556,14 +1556,33 @@ mod tests {
             vec![(0, 1), (1, 2), (2, 2), (3, 2), (4, 3), (4, 4)],
         );
 
-        // Add a wall down the center
+        // Add walls along chunk borders
         let start = (0, 0);
-        let goal = (3, 2);
+        let goal = (3, 4);
         let path = pathfinding.find_path(start, goal, cost_fn(&grid));
         assert!(path.is_some());
 
+        // Vertical wall
         let changed_tiles: Vec<_> = (0..grid.len()).map(|y| (2, y)).collect();
-        grid.iter_mut().for_each(|row| row[2] = 2);
+        grid.iter_mut().for_each(|row| row[3] = 2);
+        pathfinding.tiles_changed(&changed_tiles, cost_fn(&grid));
+
+        let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+        assert!(path.is_none());
+
+        let goal = (2, 4);
+        let path = pathfinding.find_path(start, goal, cost_fn(&grid));
+        assert!(path.is_some());
+
+        // Horizontal wall
+        let mut changed_tiles = Vec::new();
+        {
+            let y = 2;
+            for x in 0..grid[y].len() {
+                grid[y][x] = 2;
+                changed_tiles.push((x, y));
+            }
+        }
         pathfinding.tiles_changed(&changed_tiles, cost_fn(&grid));
 
         let path = pathfinding.find_path(start, goal, cost_fn(&grid));
