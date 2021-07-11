@@ -882,12 +882,11 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         re_trace!("establish renew", timer);
 
-        let mut changed_nodes = NodeIDSet::default();
-
         // remove all nodes of sides in renew
+        let mut to_remove: NodeIDSet = NodeIDSet::default();
+
         for (&cp, sides) in renew.iter() {
             let chunk_index = self.get_chunk_index(cp);
-
             let chunk = &self.chunks[chunk_index];
             let removed = chunk
                 .nodes
@@ -909,11 +908,17 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
             for id in removed {
                 chunk.nodes.remove(&id);
-                self.nodes.remove_node(id);
+                to_remove.insert(id);
             }
         }
 
+        re_trace!("establish to_remove", timer);
+
+        self.nodes.remove_nodes(&to_remove);
+
         re_trace!("remove nodes of sides in renew", timer);
+
+        let mut changed_nodes = NodeIDSet::default();
 
         // remove all Paths in changed chunks
         for cp in dirty.keys() {

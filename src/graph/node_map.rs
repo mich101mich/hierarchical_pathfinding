@@ -50,12 +50,25 @@ impl NodeMap {
     }
 
     #[track_caller]
-    pub fn remove_node(&mut self, id: NodeID) {
-        let node = self.nodes[id as usize].take().unwrap();
-        for (other_id, _) in node.edges {
-            self[other_id].edges.remove(&id);
-        }
-        self.pos_map.remove(&node.pos);
+    pub fn remove_nodes(&mut self, ids: &NodeIDSet) {
+        let mut to_remove = hashbrown::HashMap::with_capacity(ids.len());
+
+        ids.iter().for_each(|id| {
+            let node = self.nodes[*id as usize].take().unwrap();
+
+            self.pos_map.remove(&node.pos);
+
+            node.edges.iter().for_each(|(&other_id, _)| {
+                to_remove.insert(other_id, *id);
+            });
+        });
+
+        // Filter out nodes that were removed.
+        to_remove.retain(|other_id, _| !ids.contains(other_id));
+
+        to_remove.iter().for_each(|(other_id, id)| {
+            self[*other_id].edges.remove(id);
+        });
     }
 
     #[allow(unused)]
