@@ -1,7 +1,7 @@
 extern crate hierarchical_pathfinding;
 use env_logger::Env;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use hierarchical_pathfinding::prelude::*;
 use log::warn;
@@ -66,6 +66,10 @@ impl Map {
 
         Some(x + y * self.width)
     }
+
+    fn cost_fn(&self) -> impl '_ + Fn((usize, usize)) -> isize {
+        move |(x, y)| self.get_tile_cost(x, y)
+    }
 }
 
 #[allow(unused)]
@@ -73,13 +77,13 @@ impl Map {
 fn init() {
     let env = Env::default()
         .filter_or("MY_LOG_LEVEL", "debug") // Change this from debug to trace to enable more in-depth timings.
-        .write_style_or("MY_LOG_STYLE", "always");
+        .write_style_or("MY_LOG_STYLE", "auto");
 
     env_logger::init_from_env(env);
     let _ = env_logger::builder().is_test(true).try_init();
 }
 
-fn bench_create_patchcache(c: &mut Criterion) {
+fn bench_create_pathcache(c: &mut Criterion) {
     let mut group = c.benchmark_group("Create PathCache");
     group.sample_size(10);
 
@@ -102,39 +106,30 @@ fn bench_create_patchcache(c: &mut Criterion) {
                 );
                 group.bench_function(&id, |b| {
                     b.iter(|| {
-                        PathCache::new_parallel(
+                        PathCache::new(
                             (width, height),
-                            |(x, y)| map.get_tile_cost(x, y),
+                            map.cost_fn(),
                             MooreNeighborhood::new(width, height), //
-                            PathCacheConfig {
-                                chunk_size,
-                                ..Default::default()
-                            },
+                            PathCacheConfig::with_chunk_size(chunk_size),
                         )
                     })
                 });
             }
 
-            #[cfg(not(feature = "parallel"))]
-            {
-                let id = format!(
-                    "Create cache, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
-                    width, height, chunk_size
-                );
-                group.bench_function(&id, |b| {
-                    b.iter(|| {
-                        PathCache::new(
-                            (width, height),
-                            |(x, y)| map.get_tile_cost(x, y),
-                            MooreNeighborhood::new(width, height),
-                            PathCacheConfig {
-                                chunk_size,
-                                ..Default::default()
-                            },
-                        )
-                    })
-                });
-            }
+            let id = format!(
+                "Create cache, Uniform map, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
+                width, height, chunk_size
+            );
+            group.bench_function(&id, |b| {
+                b.iter(|| {
+                    PathCache::new_with_fn_mut(
+                        (width, height),
+                        map.cost_fn(),
+                        MooreNeighborhood::new(width, height),
+                        PathCacheConfig::with_chunk_size(chunk_size),
+                    )
+                })
+            });
         }
     }
 
@@ -151,78 +146,48 @@ fn bench_create_patchcache(c: &mut Criterion) {
             "Create cache, Large Random Map, Parallel, Map Size: ({}, {}), Cache Size: {}",
             width, height, chunk_size
         );
-        group.bench_with_input(
-            &id,
-            &(map, chunk_size, width, height),
-            |b, (map, chunk_size, width, height)| {
-                b.iter(|| {
-                    PathCache::new_parallel(
-                        (*width, *height),
-                        |(x, y)| map.get_tile_cost(x, y),
-                        MooreNeighborhood::new(*width, *height),
-                        PathCacheConfig {
-                            chunk_size: *chunk_size,
-                            ..Default::default()
-                        }, // config
-                    )
-                })
-            },
-        );
-    }
-    #[cfg(not(feature = "parallel"))]
-    {
-        let id = format!(
-            "Create cache, Large Random Map, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
-            width, height, chunk_size
-        );
         group.bench_function(&id, |b| {
             b.iter(|| {
                 PathCache::new(
                     (width, height),
-                    |(x, y)| map.get_tile_cost(x, y),
-                    ManhattanNeighborhood::new(width, height),
-                    PathCacheConfig {
-                        chunk_size,
-                        ..Default::default()
-                    },
+                    map.cost_fn(),
+                    MooreNeighborhood::new(width, height),
+                    PathCacheConfig::with_chunk_size(chunk_size),
                 )
             })
         });
     }
+    let id = format!(
+        "Create cache, Large Random Map, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
+        width, height, chunk_size
+    );
+    group.bench_function(&id, |b| {
+        b.iter(|| {
+            PathCache::new_with_fn_mut(
+                (width, height),
+                map.cost_fn(),
+                ManhattanNeighborhood::new(width, height),
+                PathCacheConfig::with_chunk_size(chunk_size),
+            )
+        })
+    });
 }
 
-fn bench_update_patchcache(c: &mut Criterion) {
+fn bench_update_pathcache(c: &mut Criterion) {
     let mut group = c.benchmark_group("Update PathCache");
+    group.measurement_time(std::time::Duration::from_secs(60));
     // init();
 
     // Create our map
     let (width, height) = (1024, 1024);
     let mut map = Map::new_random(width, height);
     let chunk_size = 32;
-    #[cfg(feature = "parallel")]
-    let mut pathcache = PathCache::new_parallel(
+    let pathcache = PathCache::new(
         (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
+        map.cost_fn(),
         MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
+        PathCacheConfig::with_chunk_size(chunk_size),
     );
-
-    #[cfg(not(feature = "parallel"))]
-    let mut pathcache = PathCache::new(
-        (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
-        MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
-    );
-
-    // Use this for the parllel bench, so we aren't updaing the same pathcache twice.
-    let mut pathcache_clone = pathcache.clone();
 
     // Put a solid wall across our map
     let mut changed = Vec::with_capacity(width);
@@ -230,7 +195,6 @@ fn bench_update_patchcache(c: &mut Criterion) {
         map.set_cost(x, 8, -1);
         changed.push((x, 8));
     }
-
     #[cfg(feature = "parallel")]
     {
         let id = format!(
@@ -238,9 +202,12 @@ fn bench_update_patchcache(c: &mut Criterion) {
             width, height, chunk_size
         );
         group.bench_function(&id, |b| {
-            b.iter(|| {
-                pathcache_clone.tiles_changed_parallel(&changed, |(x, y)| map.get_tile_cost(x, y));
-            })
+            // clone on every iteration, so we aren't updaing the same pathcache twice.
+            b.iter_batched_ref(
+                || pathcache.clone(),
+                |cache| cache.tiles_changed(&changed, map.cost_fn()),
+                BatchSize::SmallInput,
+            )
         });
     }
 
@@ -251,163 +218,197 @@ fn bench_update_patchcache(c: &mut Criterion) {
         width, height, chunk_size
     );
     group.bench_function(&id, |b| {
-        b.iter(|| {
-            pathcache.tiles_changed(&changed, |(x, y)| map.get_tile_cost(x, y));
-        })
+        b.iter_batched_ref(
+            || pathcache.clone(),
+            |cache| cache.tiles_changed_with_fn_mut(&changed, map.cost_fn()),
+            BatchSize::SmallInput,
+        )
     });
 }
 
 fn bench_get_path(c: &mut Criterion) {
     let mut group = c.benchmark_group("Get Path");
 
-    // Medium uniform map
-    let (width, height) = (128, 128);
-    let map = Map::new(width, height);
-    let chunk_size = 32;
-    #[cfg(feature = "parallel")]
-    let pathcache = PathCache::new_parallel(
-        (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
-        MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
-    );
-    #[cfg(not(feature = "parallel"))]
-    let pathcache = PathCache::new(
-        (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
-        MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
-    );
-    let id = format!(
-        "Get Single Path, Medium Uniform Map, Map Size: ({}, {}), Cache Size: {}",
-        width, height, chunk_size
-    );
-    group.bench_function(&id, |b| {
-        b.iter(|| {
-            pathcache.find_path((0, 0), (127, 127), |(x, y)| map.get_tile_cost(x, y));
-        })
-    });
+    for (size, iterations, name, start, goal) in [
+        (128, 100, "Medium", (0, 0), (127, 127)),
+        (256, 50, "Medium+", (1, 1), (200, 250)),
+        (512, 20, "Medium++", (10, 30), (500, 400)),
+        (1024, 10, "Large", (40, 90), (900, 600)),
+    ] {
+        group.sample_size(iterations);
 
-    // Medium random map
-    let (width, height) = (128, 128);
-    let map = Map::new_random(width, height);
-    let chunk_size = 32;
+        // uniform map
+        let map = Map::new(size, size);
+        let neighborhood = MooreNeighborhood::new(size, size);
+        let chunk_size = 32;
+        let pathcache = PathCache::new(
+            (size, size),
+            map.cost_fn(),
+            neighborhood,
+            PathCacheConfig::with_chunk_size(chunk_size),
+        );
+        let id = format!(
+            "Get Single Path, {} Uniform Map, Map Size: ({}, {}), Cache Size: {}",
+            name, size, size, chunk_size
+        );
+        log::trace!("");
+        log::trace!("{}", id);
+        log::trace!("");
+        group.bench_function(&id, |b| {
+            b.iter(|| pathcache.find_path(start, goal, map.cost_fn()))
+        });
 
-    #[cfg(feature = "parallel")]
-    let pathcache = PathCache::new_parallel(
-        (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
-        MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
-    );
-    #[cfg(not(feature = "parallel"))]
-    let pathcache = PathCache::new(
-        (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
-        MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
-    );
+        // a_star comparison
+        let id = format!(
+            "Get Single Path A*, {} Uniform Map, Map Size: ({}, {})",
+            name, size, size
+        );
+        group.bench_function(&id, |b| {
+            b.iter(|| a_star_search(&neighborhood, |_| true, map.cost_fn(), start, goal))
+        });
 
-    let id = format!(
-        "Get Single Path, Medium Random Map, Map Size: ({}, {}), Cache Size: {}",
-        width, height, chunk_size
-    );
-    group.bench_function(&id, |b| {
-        b.iter(|| {
-            pathcache.find_path((0, 0), (127, 127), |(x, y)| map.get_tile_cost(x, y));
-        })
-    });
+        // random map
+        let map = Map::new_random(size, size);
+        let pathcache = PathCache::new(
+            (size, size),
+            map.cost_fn(),
+            neighborhood,
+            PathCacheConfig::with_chunk_size(chunk_size),
+        );
+        let id = format!(
+            "Get Single Path, {} Random Map, Map Size: ({}, {}), Cache Size: {}",
+            name, size, size, chunk_size
+        );
+        log::trace!("");
+        log::trace!("{}", id);
+        log::trace!("");
+        group.bench_function(&id, |b| {
+            b.iter(|| pathcache.find_path(start, goal, map.cost_fn()))
+        });
 
-    // For large maps, use a smaller sample size so they don't take 30+s per run.
-    group.sample_size(10);
-
-    // Large Uniform map
-    let (width, height) = (1024, 1024);
-    let map = Map::new(width, height);
-    let chunk_size = 32;
-    #[cfg(feature = "parallel")]
-    let pathcache = PathCache::new_parallel(
-        (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
-        MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
-    );
-    #[cfg(not(feature = "parallel"))]
-    let pathcache = PathCache::new(
-        (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
-        MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
-    );
-
-    let id = format!(
-        "Get Single Path, Large Uniform Map, Map Size: ({}, {}), Cache Size: {}",
-        width, height, chunk_size
-    );
-    group.bench_function(&id, |b| {
-        b.iter(|| {
-            pathcache.find_path((40, 90), (900, 600), |(x, y)| map.get_tile_cost(x, y));
-        })
-    });
-
-    // Large Random map
-    let (width, height) = (1024, 1024);
-    let map = Map::new_random(width, height);
-    let chunk_size = 64;
-    #[cfg(feature = "parallel")]
-    let pathcache = PathCache::new_parallel(
-        (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
-        MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
-    );
-    #[cfg(not(feature = "parallel"))]
-    let pathcache = PathCache::new(
-        (width, height),
-        |(x, y)| map.get_tile_cost(x, y),
-        MooreNeighborhood::new(width, height),
-        PathCacheConfig {
-            chunk_size,
-            ..Default::default()
-        },
-    );
-
-    let id = format!(
-        "Get Single Path, Large Random Map, Map Size: ({}, {}), Cache Size: {}",
-        width, height, chunk_size
-    );
-    group.bench_function(&id, |b| {
-        b.iter(|| {
-            pathcache.find_path((40, 90), (900, 600), |(x, y)| map.get_tile_cost(x, y));
-        })
-    });
+        // a_star comparison
+        let id = format!(
+            "Get Single Path A*, {} Random Map, Map Size: ({}, {})",
+            name, size, size
+        );
+        group.bench_function(&id, |b| {
+            b.iter(|| a_star_search(&neighborhood, |_| true, map.cost_fn(), start, goal))
+        });
+    }
 }
 
 criterion_group!(
     benches,
-    bench_create_patchcache,
-    bench_update_patchcache,
+    bench_create_pathcache,
+    bench_update_pathcache,
     bench_get_path
 );
 criterion_main!(benches);
+
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+type Point = (usize, usize);
+
+pub fn a_star_search<N: Neighborhood>(
+    neighborhood: &N,
+    mut valid: impl FnMut(Point) -> bool,
+    mut get_cost: impl FnMut(Point) -> isize,
+    start: Point,
+    goal: Point,
+) -> Option<Vec<Point>> {
+    if get_cost(start) < 0 {
+        return None;
+    }
+    if start == goal {
+        return Some([start, start].into());
+    }
+    let mut visited = hashbrown::HashMap::<_, _>::default();
+    let mut next = BinaryHeap::new();
+    next.push(HeuristicElement(start, 0, 0));
+    visited.insert(start, (0, start));
+
+    let mut all_neighbors = vec![];
+
+    while let Some(HeuristicElement(current_id, current_cost, _)) = next.pop() {
+        if current_id == goal {
+            break;
+        }
+        match current_cost.cmp(&visited[&current_id].0) {
+            Ordering::Greater => continue,
+            Ordering::Equal => {}
+            Ordering::Less => panic!("Binary Heap failed"),
+        }
+
+        let delta_cost = get_cost(current_id);
+        if delta_cost < 0 {
+            continue;
+        }
+        let other_cost = current_cost + delta_cost as usize;
+
+        all_neighbors.clear();
+        neighborhood.get_all_neighbors(current_id, &mut all_neighbors);
+        for &other_id in all_neighbors.iter() {
+            if !valid(other_id) {
+                continue;
+            }
+            if get_cost(other_id) < 0 && other_id != goal {
+                continue;
+            }
+
+            let mut needs_visit = true;
+            if let Some((prev_cost, prev_id)) = visited.get_mut(&other_id) {
+                if *prev_cost > other_cost {
+                    *prev_cost = other_cost;
+                    *prev_id = current_id;
+                } else {
+                    needs_visit = false;
+                }
+            } else {
+                visited.insert(other_id, (other_cost, current_id));
+            }
+
+            if needs_visit {
+                let heuristic = neighborhood.heuristic(other_id, goal);
+                next.push(HeuristicElement(
+                    other_id,
+                    other_cost,
+                    other_cost + heuristic,
+                ));
+            }
+        }
+    }
+
+    if !visited.contains_key(&goal) {
+        return None;
+    }
+
+    let steps = {
+        let mut steps = vec![];
+        let mut current = goal;
+
+        while current != start {
+            steps.push(current);
+            let (_, prev) = visited[&current];
+            current = prev;
+        }
+        steps.push(start);
+        steps.reverse();
+        steps
+    };
+
+    Some(steps)
+}
+
+type Cost = usize;
+#[derive(PartialEq, Eq)]
+pub struct HeuristicElement<Id>(pub Id, pub Cost, pub Cost);
+impl<Id: Eq> PartialOrd for HeuristicElement<Id> {
+    fn partial_cmp(&self, rhs: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(rhs))
+    }
+}
+impl<Id: Eq> Ord for HeuristicElement<Id> {
+    fn cmp(&self, rhs: &Self) -> std::cmp::Ordering {
+        rhs.2.cmp(&self.2)
+    }
+}

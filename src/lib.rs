@@ -121,7 +121,7 @@
 //! const COST_MAP: [isize; 3] = [1, 10, -1]; // now const for ownership reasons
 //!
 //! // only borrows the Grid when called
-//! fn cost_fn(grid: &Grid) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! fn cost_fn(grid: &Grid) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //!     move |(x, y)| COST_MAP[grid[y][x]]
 //! }
 //!
@@ -132,7 +132,7 @@
 //!     cost_fn(&grid),
 //!     // ...
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
+//! #     PathCacheConfig::with_chunk_size(3), // config
 //! # );
 //! ```
 //!
@@ -148,14 +148,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! #
 //! let start = (0, 0);
@@ -186,14 +186,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! #
 //! let start = (0, 0);
@@ -245,14 +245,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! # struct Player{ pos: (usize, usize) }
 //! # impl Player {
@@ -302,14 +302,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! #
 //! let (start, goal) = ((0, 0), (2, 0));
@@ -334,14 +334,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! #
 //! let (start, goal) = ((0, 0), (2, 0));
@@ -376,7 +376,7 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //!

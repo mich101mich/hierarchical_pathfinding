@@ -6,6 +6,16 @@ use crate::{
 };
 
 use log::trace;
+macro_rules! re_trace {
+    ($msg: literal, $timer: ident) => {
+        let now = std::time::Instant::now();
+        trace!(concat!("time to ", $msg, ": {:?}"), now - $timer);
+        #[allow(unused_assignments)]
+        {
+            $timer = now;
+        }
+    };
+}
 
 mod cache_config;
 pub use cache_config::PathCacheConfig;
@@ -66,7 +76,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ///
     /// const COST_MAP: [isize; 3] = [1, 10, -1];
     ///
-    /// fn cost_fn(grid: &Grid) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// fn cost_fn(grid: &Grid) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     ///     move |(x, y)| COST_MAP[grid[y][x]]
     /// }
     ///
@@ -74,10 +84,41 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ///     (width, height), // the size of the Grid
     ///     cost_fn(&grid), // get the cost for walking over a Tile
     ///     ManhattanNeighborhood::new(width, height), // the Neighborhood
-    ///     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
+    ///     PathCacheConfig::with_chunk_size(3), // config
     /// );
     /// ```
-    pub fn new<F: FnMut(Point) -> isize>(
+    pub fn new<F: Sync + Fn(Point) -> isize>(
+        (width, height): (usize, usize),
+        get_cost: F,
+        neighborhood: N,
+        config: PathCacheConfig,
+    ) -> PathCache<N> {
+        #[cfg(feature = "parallel")]
+        {
+            PathCache::new_internal::<F, fn(Point) -> isize>(
+                (width, height),
+                CostFnWrapper::Parallel(get_cost),
+                neighborhood,
+                config,
+            )
+        }
+        #[cfg(not(feature = "parallel"))]
+        {
+            PathCache::new_internal::<fn(Point) -> isize, F>(
+                (width, height),
+                CostFnWrapper::Sequential(get_cost),
+                neighborhood,
+                config,
+            )
+        }
+    }
+
+    /// Same as [`new`](PathCache::new), but doesn't use threads to allow [`FnMut`].
+    ///
+    /// Equivalent to `new` if `parallel` feature is disabled.
+    ///
+    /// Note that this is _**way**_ slower than `new` with `parallel`.
+    pub fn new_with_fn_mut<F: FnMut(Point) -> isize>(
         (width, height): (usize, usize),
         get_cost: F,
         neighborhood: N,
@@ -86,24 +127,6 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         PathCache::new_internal::<fn(Point) -> isize, F>(
             (width, height),
             CostFnWrapper::Sequential(get_cost),
-            neighborhood,
-            config,
-        )
-    }
-
-    /// Same as [`new`](PathCache::new), but uses multiple threads.
-    ///
-    /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
-    #[cfg(feature = "parallel")]
-    pub fn new_parallel<F: Sync + Fn(Point) -> isize>(
-        (width, height): (usize, usize),
-        get_cost: F,
-        neighborhood: N,
-        config: PathCacheConfig,
-    ) -> PathCache<N> {
-        PathCache::new_internal::<F, fn(Point) -> isize>(
-            (width, height),
-            CostFnWrapper::Parallel(get_cost),
             neighborhood,
             config,
         )
@@ -257,7 +280,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 0, 0, 2, 0],
     /// # ];
     /// # let (width, height) = (grid.len(), grid[0].len());
-    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
     /// let pathfinding: PathCache<_> = // ...
@@ -265,7 +288,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     (width, height),
     /// #     cost_fn(&grid),
     /// #     ManhattanNeighborhood::new(width, height),
-    /// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+    /// #     PathCacheConfig::with_chunk_size(3),
     /// # );
     ///
     /// let start = (0, 0);
@@ -303,14 +326,14 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 0, 0, 2, 0],
     /// # ];
     /// # let (width, height) = (grid.len(), grid[0].len());
-    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
     /// # let pathfinding = PathCache::new(
     /// #     (width, height),
     /// #     cost_fn(&grid),
     /// #     ManhattanNeighborhood::new(width, height),
-    /// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+    /// #     PathCacheConfig::with_chunk_size(3),
     /// # );
     /// # struct Player{ pos: (usize, usize) }
     /// # impl Player {
@@ -354,14 +377,14 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 0, 0, 2, 0],
     /// # ];
     /// # let (width, height) = (grid.len(), grid[0].len());
-    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
     /// # let pathfinding = PathCache::new(
     /// #     (width, height),
     /// #     cost_fn(&grid),
     /// #     ManhattanNeighborhood::new(width, height),
-    /// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+    /// #     PathCacheConfig::with_chunk_size(3),
     /// # );
     /// # let start = (0, 0);
     /// # let goal = (4, 4);
@@ -386,6 +409,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         goal: Point,
         mut get_cost: impl FnMut(Point) -> isize,
     ) -> Option<AbstractPath<N>> {
+        let outer_timer = std::time::Instant::now();
+        let mut timer = outer_timer;
+
         if get_cost(start) < 0 {
             // cannot start on a wall
             return None;
@@ -415,6 +441,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         // try-operator: see above, but we know that start is not in a cave
         let (goal_id, goal_path) = self.find_nearest_node(goal, &mut get_cost, true)?;
 
+        re_trace!("find nodes", timer);
+
         // size hint for number of visited nodes in graph::a_star_search:
         //     percentage of total area visited (heuristic / max_heuristic)
         //     as the percentage of nodes visited ( * self.nodes.len())
@@ -431,28 +459,40 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             size_hint as usize,
         )?;
 
+        re_trace!("graph::a_star_search", timer);
 
         if path.len() == 2 || (self.config.a_star_fallback && path.len() <= 4) {
             // 2: start_id == goal_id
             // <= 4: start_id X X goal_id
-            return self
+            let res = self
                 .grid_a_star(start, goal, get_cost)
                 .map(|path| AbstractPath::from_known_path(neighborhood, path));
+
+            re_trace!("A* fallback", timer);
+            trace!("total time: {:?}", std::time::Instant::now() - outer_timer);
+
+            return res;
         }
 
         let mut paths = NodeIDMap::default();
         paths.insert(goal_id, path);
 
-        self.resolve_paths(
-            start,
-            start_path,
-            &[(goal, goal_id, goal_path)],
-            &paths,
-            get_cost,
-        )
-        .into_iter()
-        .next()
-        .map(|(_, path)| path)
+        let res = self
+            .resolve_paths(
+                start,
+                start_path,
+                &[(goal, goal_id, goal_path)],
+                &paths,
+                get_cost,
+            )
+            .into_iter()
+            .next()
+            .map(|(_, path)| path);
+
+        re_trace!("resolve_paths", timer);
+        trace!("total time: {:?}", std::time::Instant::now() - outer_timer);
+
+        res
     }
 
     /// Calculates the Paths from one `start` to several `goals` on the Grid.
@@ -481,7 +521,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 0, 0, 2, 0],
     /// # ];
     /// # let (width, height) = (grid.len(), grid[0].len());
-    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
     /// let pathfinding: PathCache<_> = // ...
@@ -489,7 +529,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     (width, height),
     /// #     cost_fn(&grid),
     /// #     ManhattanNeighborhood::new(width, height),
-    /// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+    /// #     PathCacheConfig::with_chunk_size(3),
     /// # );
     ///
     /// let start = (0, 0);
@@ -520,14 +560,14 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 0, 0, 2, 0],
     /// # ];
     /// # let (width, height) = (grid.len(), grid[0].len());
-    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
     /// # let pathfinding = PathCache::new(
     /// #     (width, height),
     /// #     cost_fn(&grid),
     /// #     ManhattanNeighborhood::new(width, height),
-    /// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+    /// #     PathCacheConfig::with_chunk_size(3),
     /// # );
     /// let start = (0, 0);
     /// let goal = (4, 4);
@@ -576,7 +616,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 0, 0, 2, 0],
     /// # ];
     /// # let (width, height) = (grid.len(), grid[0].len());
-    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
     /// let pathfinding: PathCache<_> = // ...
@@ -584,7 +624,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     (width, height),
     /// #     cost_fn(&grid),
     /// #     ManhattanNeighborhood::new(width, height),
-    /// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+    /// #     PathCacheConfig::with_chunk_size(3),
     /// # );
     ///
     /// let start = (0, 0);
@@ -622,14 +662,14 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 0, 0, 2, 0],
     /// # ];
     /// # let (width, height) = (grid.len(), grid[0].len());
-    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
     /// # let pathfinding = PathCache::new(
     /// #     (width, height),
     /// #     cost_fn(&grid),
     /// #     ManhattanNeighborhood::new(width, height),
-    /// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+    /// #     PathCacheConfig::with_chunk_size(3),
     /// # );
     /// # let start = (0, 0);
     /// # let goals = [(4, 4), (2, 0), (2, 2)];
@@ -772,7 +812,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 0, 0, 2, 0],
     /// # ];
     /// # let (width, height) = (grid.len(), grid[0].len());
-    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
     /// let mut pathfinding: PathCache<_> = // ...
@@ -780,7 +820,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     (width, height),
     /// #     cost_fn(&grid),
     /// #     ManhattanNeighborhood::new(width, height),
-    /// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+    /// #     PathCacheConfig::with_chunk_size(3),
     /// # );
     ///
     /// let (start, goal) = ((0, 0), (2, 0));
@@ -807,31 +847,39 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// let path = pathfinding.find_path(start, goal, cost_fn(&grid));
     /// assert!(path.is_some());
     /// ```
-    pub fn tiles_changed<F: FnMut(Point) -> isize>(&mut self, tiles: &[Point], get_cost: F) {
+    pub fn tiles_changed<F: Sync + Fn(Point) -> isize>(&mut self, tiles: &[Point], get_cost: F) {
+        #[cfg(feature = "parallel")]
+        {
+            self.tiles_changed_internal::<F, fn(Point) -> isize>(
+                tiles,
+                CostFnWrapper::Parallel(get_cost),
+            )
+        }
+        #[cfg(not(feature = "parallel"))]
+        {
+            self.tiles_changed_internal::<fn(Point) -> isize, F>(
+                tiles,
+                CostFnWrapper::Sequential(get_cost),
+            )
+        }
+    }
+
+    /// Same as [`tiles_changed`](PathCache::tiles_changed), but doesn't use threads to allow [`FnMut`].
+    ///
+    /// Equivalent to `tiles_changed` if `parallel` feature is disabled.
+    ///
+    /// Note that this is _**way**_ slower than `tiles_changed` with `parallel`.
+    pub fn tiles_changed_with_fn_mut<F: FnMut(Point) -> isize>(
+        &mut self,
+        tiles: &[Point],
+        get_cost: F,
+    ) {
         self.tiles_changed_internal::<fn(Point) -> isize, F>(
             tiles,
             CostFnWrapper::Sequential(get_cost),
         )
     }
 
-    /// Same as [`tiles_changed`](PathCache::tiles_changed), but uses multiple threads.
-    ///
-    /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
-    #[cfg(feature = "parallel")]
-    pub fn tiles_changed_parallel<F: Sync + Fn(Point) -> isize>(
-        &mut self,
-        tiles: &[Point],
-        get_cost: F,
-    ) {
-        self.tiles_changed_internal::<F, fn(Point) -> isize>(
-            tiles,
-            CostFnWrapper::Parallel(get_cost),
-        )
-    }
-
-    /// Same as [`tiles_changed`](PathCache::tiles_changed), but uses multiple threads.
-    ///
-    /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
     fn tiles_changed_internal<F1, F2>(
         &mut self,
         tiles: &[Point],
@@ -844,16 +892,6 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         let outer_timer = std::time::Instant::now();
         let mut timer = outer_timer;
-        macro_rules! re_trace {
-            ($msg: literal, $timer: ident) => {
-                let now = std::time::Instant::now();
-                trace!(concat!("time to ", $msg, ": {:?}"), now - $timer);
-                #[allow(unused_assignments)]
-                {
-                    $timer = now;
-                }
-            };
-        }
 
         let mut dirty = PointMap::default();
         for &p in tiles {
@@ -1114,7 +1152,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 0, 0, 2, 0],
     /// # ];
     /// # let (width, height) = (grid.len(), grid[0].len());
-    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+    /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
     /// let pathfinding: PathCache<_> = // ...
@@ -1122,7 +1160,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     (width, height),
     /// #     cost_fn(&grid),
     /// #     ManhattanNeighborhood::new(width, height),
-    /// #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+    /// #     PathCacheConfig::with_chunk_size(3),
     /// # );
     ///
     /// // only draw the connections between Nodes once
@@ -1421,25 +1459,11 @@ mod tests {
         fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Fn((usize, usize)) -> isize {
             move |(x, y)| [1, 10, -1][grid[y][x]]
         }
-        #[cfg(feature = "parallel")]
-        let pathfinding = PathCache::new_parallel(
-            (width, height),
-            cost_fn(&grid),
-            ManhattanNeighborhood::new(width, height),
-            PathCacheConfig {
-                chunk_size: 3,
-                ..Default::default()
-            },
-        );
-        #[cfg(not(feature = "parallel"))]
         let pathfinding = PathCache::new(
             (width, height),
             cost_fn(&grid),
             ManhattanNeighborhood::new(width, height),
-            PathCacheConfig {
-                chunk_size: 3,
-                ..Default::default()
-            },
+            PathCacheConfig::with_chunk_size(3),
         );
         let start = (0, 0);
         let goal = (4, 4);
@@ -1470,10 +1494,7 @@ mod tests {
             (width, height),
             cost_fn(&grid),
             ManhattanNeighborhood::new(width, height),
-            PathCacheConfig {
-                chunk_size: 3,
-                ..Default::default()
-            },
+            PathCacheConfig::with_chunk_size(3),
         );
 
         let point = (0, 0);
@@ -1506,26 +1527,11 @@ mod tests {
             move |(x, y)| [1, 10, -1][grid[y][x]]
         }
 
-        #[cfg(feature = "parallel")]
-        let mut pathfinding = PathCache::new_parallel(
-            (width, height),
-            cost_fn(&grid),
-            MooreNeighborhood::new(width, height),
-            PathCacheConfig {
-                chunk_size: 3,
-                ..Default::default()
-            },
-        );
-
-        #[cfg(not(feature = "parallel"))]
         let mut pathfinding = PathCache::new(
             (width, height),
             cost_fn(&grid),
             MooreNeighborhood::new(width, height),
-            PathCacheConfig {
-                chunk_size: 3,
-                ..Default::default()
-            },
+            PathCacheConfig::with_chunk_size(3),
         );
 
         let start = (0, 0);
@@ -1542,9 +1548,6 @@ mod tests {
         grid[2][1] = 0;
         let changed_tiles = [(1, 1)];
 
-        #[cfg(feature = "parallel")]
-        pathfinding.tiles_changed_parallel(&changed_tiles, cost_fn(&grid));
-        #[cfg(not(feature = "parallel"))]
         pathfinding.tiles_changed(&changed_tiles, cost_fn(&grid));
 
         let start = (0, 0);
@@ -1566,9 +1569,6 @@ mod tests {
 
         let changed_tiles: Vec<_> = (0..grid.len()).map(|y| (2, y)).collect();
         grid.iter_mut().for_each(|row| row[2] = 2);
-        #[cfg(feature = "parallel")]
-        pathfinding.tiles_changed_parallel(&changed_tiles, cost_fn(&grid));
-        #[cfg(not(feature = "parallel"))]
         pathfinding.tiles_changed(&changed_tiles, cost_fn(&grid));
 
         let path = pathfinding.find_path(start, goal, cost_fn(&grid));
@@ -1591,14 +1591,11 @@ mod tests {
             });
             let cost_fn = |(x, y): (usize, usize)| grid[y][x];
             for &chunk_size in [8, 16, 64].iter() {
-                let pathfinding = PathCache::new_parallel(
+                let pathfinding = PathCache::new(
                     (size, size),
                     cost_fn,
                     ManhattanNeighborhood::new(size, size),
-                    PathCacheConfig {
-                        chunk_size,
-                        ..Default::default()
-                    },
+                    PathCacheConfig::with_chunk_size(chunk_size),
                 );
                 for _ in 0..100 {
                     let start = (rng.gen_range(0..size), rng.gen_range(0..size));
