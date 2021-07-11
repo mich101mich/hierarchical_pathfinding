@@ -1,7 +1,7 @@
 extern crate hierarchical_pathfinding;
 use env_logger::Env;
 
-use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 use hierarchical_pathfinding::prelude::*;
 use log::warn;
@@ -193,10 +193,7 @@ fn bench_create_patchcache(c: &mut Criterion) {
 
 fn bench_update_patchcache(c: &mut Criterion) {
     let mut group = c.benchmark_group("Update PathCache");
-    group.sample_size(10);
     // init();
-
-    group.sampling_mode(SamplingMode::Flat);
 
     // Create our map
     let (width, height) = (1024, 1024);
@@ -234,17 +231,6 @@ fn bench_update_patchcache(c: &mut Criterion) {
         changed.push((x, 8));
     }
 
-    let id = format!(
-        "Update cache, Large Random Map, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
-        width, height, chunk_size
-    );
-    group.bench_function(&id, |b| {
-        b.iter(|| {
-            pathcache.tiles_changed(&changed, |(x, y)| map.get_tile_cost(x, y));
-        })
-    });
-
-    // TODO: Remove this if/when tiles_changed_parallel is merged into tiles_changed
     #[cfg(feature = "parallel")]
     {
         let id = format!(
@@ -257,6 +243,18 @@ fn bench_update_patchcache(c: &mut Criterion) {
             })
         });
     }
+
+    group.sample_size(40);
+
+    let id = format!(
+        "Update cache, Large Random Map, Single Threaded, Map Size: ({}, {}), Cache Size: {}",
+        width, height, chunk_size
+    );
+    group.bench_function(&id, |b| {
+        b.iter(|| {
+            pathcache.tiles_changed(&changed, |(x, y)| map.get_tile_cost(x, y));
+        })
+    });
 }
 
 fn bench_get_path(c: &mut Criterion) {
