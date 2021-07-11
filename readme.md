@@ -3,7 +3,6 @@
 
 A Rust crate to find Paths on a Grid using HPA* (Hierarchical Pathfinding A*) and Hierarchical Dijkstra.
 
-[![Build](https://github.com/mich101mich/hierarchical_pathfinding/actions/workflows/build.yml/badge.svg)](https://github.com/mich101mich/hierarchical_pathfinding/actions/workflows/build.yml)
 [![Tests](https://github.com/mich101mich/hierarchical_pathfinding/actions/workflows/test.yml/badge.svg)](https://github.com/mich101mich/hierarchical_pathfinding/actions/workflows/test.yml)
 
 ## Description
