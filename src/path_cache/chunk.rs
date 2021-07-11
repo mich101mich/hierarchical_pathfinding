@@ -249,6 +249,14 @@ impl Chunk {
         if !self.in_chunk(start) {
             return PointMap::default();
         }
+        let heuristic = goals
+            .iter()
+            .map(|goal| neighborhood.heuristic(start, *goal))
+            .max()
+            .unwrap_or(0);
+        let max_heuristic = neighborhood.heuristic((0, 0), (self.size.0 - 1, self.size.1 - 1));
+        let max_size = self.size.0 * self.size.1;
+        let size_hint = heuristic as f32 / max_heuristic as f32 * max_size as f32;
         grid::dijkstra_search(
             neighborhood,
             |p| self.in_chunk(p),
@@ -256,6 +264,7 @@ impl Chunk {
             start,
             goals,
             false,
+            size_hint as usize,
         )
     }
 
@@ -272,23 +281,25 @@ impl Chunk {
             if !reverse {
                 return None;
             }
-            self.nodes
-                .iter()
-                .copied()
-                .filter_map(|id| {
-                    self.find_path(all_nodes[id].pos, start, &mut get_cost, neighborhood)
-                        .map(|path| (id, path))
-                })
-                .min_by_key(|(_, path)| path.cost())
+            self.nodes.iter().copied().find_map(|id| {
+                self.find_path(all_nodes[id].pos, start, &mut get_cost, neighborhood)
+                    .map(|path| (id, path))
+            })
         } else {
             let mut points = Vec::with_capacity(self.nodes.len());
             let mut map = PointMap::default();
+            let max_heuristic = neighborhood.heuristic((0, 0), (self.size.0 - 1, self.size.1 - 1));
+            let mut min_heuristic = max_heuristic;
             for id in self.nodes.iter() {
                 let node = &all_nodes[*id];
                 let point = node.pos;
                 points.push(point);
                 map.insert(point, (*id, node.walk_cost));
+                min_heuristic = min_heuristic.min(neighborhood.heuristic(start, point));
             }
+
+            let max_size = self.size.0 * self.size.1;
+            let size_hint = min_heuristic as f32 / max_heuristic as f32 * max_size as f32;
             grid::dijkstra_search(
                 neighborhood,
                 |p| self.in_chunk(p),
@@ -296,6 +307,7 @@ impl Chunk {
                 start,
                 &points,
                 true,
+                size_hint as usize,
             )
             .into_iter()
             .next()
@@ -322,7 +334,19 @@ impl Chunk {
         if !self.in_chunk(start) || !self.in_chunk(goal) {
             return None;
         }
-        grid::a_star_search(neighborhood, |p| self.in_chunk(p), get_cost, start, goal)
+        let heuristic = neighborhood.heuristic(start, goal);
+        let max_heuristic = neighborhood.heuristic((0, 0), (self.size.0 - 1, self.size.1 - 1));
+        let max_size = self.size.0 * self.size.1;
+        let size_hint = heuristic as f32 / max_heuristic as f32 * max_size as f32;
+
+        grid::a_star_search(
+            neighborhood,
+            |p| self.in_chunk(p),
+            get_cost,
+            start,
+            goal,
+            size_hint as usize,
+        )
     }
 
     pub fn in_chunk(&self, point: Point) -> bool {

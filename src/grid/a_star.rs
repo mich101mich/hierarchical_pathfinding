@@ -10,6 +10,7 @@ pub fn a_star_search<N: Neighborhood>(
     mut get_cost: impl FnMut(Point) -> isize,
     start: Point,
     goal: Point,
+    size_hint: usize,
 ) -> Option<Path<Point>> {
     if get_cost(start) < 0 {
         return None;
@@ -17,8 +18,8 @@ pub fn a_star_search<N: Neighborhood>(
     if start == goal {
         return Some(Path::from_slice(&[start, start], 0));
     }
-    let mut visited = PointMap::default();
-    let mut next = BinaryHeap::new();
+    let mut visited = PointMap::with_capacity(size_hint);
+    let mut next = BinaryHeap::with_capacity(size_hint / 2);
     next.push(HeuristicElement(start, 0, 0));
     visited.insert(start, (0, start));
 
@@ -124,7 +125,7 @@ mod tests {
         let start = (0, 0);
         let goal = (2, 0);
 
-        let path = a_star_search(&neighborhood, |_| true, cost_fn(&grid), start, goal);
+        let path = a_star_search(&neighborhood, |_| true, cost_fn(&grid), start, goal, 40);
 
         assert!(path.is_none());
     }
@@ -154,7 +155,7 @@ mod tests {
 
         let start = (0, 0);
         let goal = (4, 4);
-        let path = a_star_search(&neighborhood, |_| true, cost_fn(&grid), start, goal);
+        let path = a_star_search(&neighborhood, |_| true, cost_fn(&grid), start, goal, 40);
 
         assert!(path.is_some());
         let path = path.unwrap();

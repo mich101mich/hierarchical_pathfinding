@@ -1,5 +1,5 @@
 use super::{Cost, Path, PathSegment};
-use crate::{grid::a_star_search, neighbors::Neighborhood, Point};
+use crate::{grid, neighbors::Neighborhood, Point};
 
 /// A Path that may not be fully calculated yet.
 ///
@@ -57,12 +57,13 @@ impl<N: Neighborhood> AbstractPath<N> {
         }
         let mut current = &self.path[self.current_index.0];
         if let PathSegment::Unknown { start, end, .. } = *current {
-            let path = a_star_search(
+            let path = grid::a_star_search(
                 &self.neighborhood,
                 |_| true,
                 get_cost.expect("Tried calling next() on a Path that is not fully known. Use safe_next() instead."),
                 start,
                 end,
+                self.neighborhood.heuristic(start, end) * 2
             )
             .unwrap_or_else(|| {
                 panic!(

@@ -415,7 +415,22 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         // try-operator: see above, but we know that start is not in a cave
         let (goal_id, goal_path) = self.find_nearest_node(goal, &mut get_cost, true)?;
 
-        let path = graph::a_star_search(&self.nodes, start_id, goal_id, &neighborhood)?;
+        // size hint for number of visited nodes in graph::a_star_search:
+        //     percentage of total area visited (heuristic / max_heuristic)
+        //     as the percentage of nodes visited ( * self.nodes.len())
+        let heuristic = neighborhood.heuristic(start, goal);
+        let max_heuristic = neighborhood.heuristic((0, 0), (self.width - 1, self.height - 1));
+        let max_size = self.nodes.len();
+        let size_hint = heuristic as f32 / max_heuristic as f32 * max_size as f32;
+
+        let path = graph::a_star_search(
+            &self.nodes,
+            start_id,
+            goal_id,
+            &neighborhood,
+            size_hint as usize,
+        )?;
+
 
         if path.len() == 2 || (self.config.a_star_fallback && path.len() <= 4) {
             // 2: start_id == goal_id
@@ -692,6 +707,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         let mut goal_ids = Vec::with_capacity(goals.len());
 
         let mut ret = PointMap::default();
+        let mut heuristic = 0;
 
         for goal in goals.iter().copied() {
             if goal == start {
@@ -712,9 +728,24 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
             goal_data.push((goal, goal_id, goal_path));
             goal_ids.push(goal_id);
+            if only_closest_goal {
+                heuristic = heuristic.min(self.neighborhood.heuristic(start, goal));
+            } else {
+                heuristic = heuristic.max(self.neighborhood.heuristic(start, goal));
+            }
         }
 
-        let paths = graph::dijkstra_search(&self.nodes, start_id, &goal_ids, only_closest_goal);
+        let max_heuristic = neighborhood.heuristic((0, 0), (self.width - 1, self.height - 1));
+        let max_size = self.nodes.len();
+        let size_hint = heuristic as f32 / max_heuristic as f32 * max_size as f32;
+
+        let paths = graph::dijkstra_search(
+            &self.nodes,
+            start_id,
+            &goal_ids,
+            only_closest_goal,
+            size_hint as usize,
+        );
 
         self.resolve_paths(start, start_path, &goal_data, &paths, get_cost)
     }
@@ -1178,7 +1209,21 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         goal: Point,
         get_cost: impl FnMut(Point) -> isize,
     ) -> Option<Path<Point>> {
-        grid::a_star_search(&self.neighborhood, |_| true, get_cost, start, goal)
+        let heuristic = self.neighborhood.heuristic(start, goal);
+        let max_heuristic = self
+            .neighborhood
+            .heuristic((0, 0), (self.width - 1, self.height - 1));
+        let max_size = self.width * self.height;
+        let size_hint = heuristic as f32 / max_heuristic as f32 * max_size as f32;
+
+        grid::a_star_search(
+            &self.neighborhood,
+            |_| true,
+            get_cost,
+            start,
+            goal,
+            size_hint as usize,
+        )
     }
 
     fn resolve_paths(
@@ -1206,7 +1251,12 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 let after_start = self.nodes[path[1]].pos;
                 if self.same_chunk(start, after_start) {
                     start_path = Some(start_path_map.entry(after_start).or_insert_with(|| {
-                        self.grid_a_star(start, after_start, &mut get_cost)
+                        // this is contained within a chunk, because start_path is contained and
+                        // (start_id, after_start) must be contained:
+                        // Direct paths between nodes are only added in chunk::(connect/add)_nodes,
+                        // or in the cross-chunk connect_nodes
+                        self.get_chunk(start)
+                            .find_path(start, after_start, &mut get_cost, &self.neighborhood)
                             .expect("Inconsistency in Pathfinding")
                     }));
                     skip_first = true;
@@ -1236,7 +1286,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
             if skip_last {
                 final_path.add_path(
-                    self.grid_a_star(before_goal, *goal, &mut get_cost)
+                    // reasoning for chunk containment: see start_path equivalent
+                    self.get_chunk(before_goal)
+                        .find_path(before_goal, *goal, &mut get_cost, &self.neighborhood)
                         .expect("Inconsistency in Pathfinding"),
                 );
             } else if let Some(path) = goal_path {

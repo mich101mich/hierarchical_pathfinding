@@ -17,6 +17,11 @@ impl NodeMap {
         }
     }
 
+    #[allow(unused)]
+    pub fn len(&self) -> usize {
+        self.pos_map.len()
+    }
+
     pub fn add_node(&mut self, pos: Point, walk_cost: usize) -> NodeID {
         while self.next_id < self.nodes.len() && self.nodes[self.next_id].is_some() {
             self.next_id += 1;
