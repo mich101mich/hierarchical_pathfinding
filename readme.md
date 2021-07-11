@@ -3,7 +3,6 @@
 
 A Rust crate to find Paths on a Grid using HPA* (Hierarchical Pathfinding A*) and Hierarchical Dijkstra.
 
-[![Build](https://github.com/mich101mich/hierarchical_pathfinding/actions/workflows/build.yml/badge.svg)](https://github.com/mich101mich/hierarchical_pathfinding/actions/workflows/build.yml)
 [![Tests](https://github.com/mich101mich/hierarchical_pathfinding/actions/workflows/test.yml/badge.svg)](https://github.com/mich101mich/hierarchical_pathfinding/actions/workflows/test.yml)
 
 ## Description
@@ -55,7 +54,7 @@ let mut pathfinding = PathCache::new(
     (width, height),   // the size of the Grid
     |(x, y)| walking_cost(x, y),   // get the cost for walking over a Tile
     ManhattanNeighborhood::new(width, height),   // the Neighborhood
-    PathCacheConfig { chunk_size: 3, ..Default::default() },   // config
+    PathCacheConfig::with_chunk_size(3),   // config
 );
 
 let start = (0, 0);

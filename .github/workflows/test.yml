@@ -26,3 +26,7 @@ jobs:
       run: cargo test
     - name: Run nightly tests
       run: cargo +nightly test
+    - name: Run seq tests
+      run: cargo test --no-default-features
+    - name: Run nightly seq tests
+      run: cargo +nightly test --no-default-features

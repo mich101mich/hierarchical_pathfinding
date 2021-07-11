@@ -17,6 +17,11 @@ impl NodeMap {
         }
     }
 
+    #[allow(unused)]
+    pub fn len(&self) -> usize {
+        self.pos_map.len()
+    }
+
     pub fn add_node(&mut self, pos: Point, walk_cost: usize) -> NodeID {
         while self.next_id < self.nodes.len() && self.nodes[self.next_id].is_some() {
             self.next_id += 1;
@@ -72,6 +77,8 @@ impl NodeMap {
             .filter(|(_, opt)| opt.is_some())
             .map(|(id, _)| id as NodeID)
     }
+
+    #[allow(unused)]
     pub fn values(&self) -> impl Iterator<Item = &Node> + '_ {
         self.nodes.iter().filter_map(|opt| opt.as_ref())
     }
@@ -80,6 +87,7 @@ impl NodeMap {
         self.pos_map.get(&pos).copied()
     }
 
+    #[allow(unused)]
     pub fn absorb(&mut self, other: NodeMap) -> NodeIDSet {
         let mut ret = NodeIDSet::default();
         let mut map = NodeIDMap::default();

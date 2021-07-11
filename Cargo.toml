@@ -1,6 +1,6 @@
 [package]
 name = "hierarchical_pathfinding"
-version = "0.4.3"
+version = "0.5.0"
 authors = ["mich101mich <mich101mich@gmail.com>"]
 edition = "2018"
 description = "Quickly approximate Paths on a Grid"
@@ -9,14 +9,32 @@ readme = "readme.md"
 license = "MIT"
 keywords = ["pathfinding", "dijkstra", "a-star", "grid"]
 categories = ["algorithms"]
-exclude = ["/.vscode/*", "/todo.md", "/.gitignore", "/.github/*", "/benchmark/*", "/img/*"]
+exclude = [
+    "/.vscode/*",
+    "/todo.md",
+    "/.gitignore",
+    "/.github/*",
+    "/benchmark/*",
+    "/img/*",
+    "/benches/*",
+]
 
 [dependencies]
-fnv = "1.0"
-rayon = { version = "1.5", optional = true }
+hashbrown = "0.11.2"
+log = "0.4.14"
+rayon = { version = "1.5.1", optional = true }
 
 [dev-dependencies]
-rand = { version = "0.8", features = ["std_rng"] }
+rand = { version = "0.8.4", features = ["std_rng"] }
+criterion = "0.3.4"
+oorandom = "11.1.3"
+env_logger = "0.8.4"
+
+[[bench]]
+name = "my_benchmark"
+harness = false
+
 
 [features]
-default = ["rayon"]
+default = ["parallel"]
+parallel = ["rayon", "hashbrown/rayon"]
