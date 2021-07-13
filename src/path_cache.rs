@@ -1564,7 +1564,7 @@ mod tests {
 
         // Vertical wall
         let changed_tiles: Vec<_> = (0..grid.len()).map(|y| (2, y)).collect();
-        grid.iter_mut().for_each(|row| row[3] = 2);
+        grid.iter_mut().for_each(|row| row[2] = 2);
         pathfinding.tiles_changed(&changed_tiles, cost_fn(&grid));
 
         let path = pathfinding.find_path(start, goal, cost_fn(&grid));
