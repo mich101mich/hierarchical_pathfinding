@@ -76,7 +76,7 @@ impl Map {
 // Setup logging output
 fn init() {
     let env = Env::default()
-        .filter_or("MY_LOG_LEVEL", "debug") // Change this from debug to trace to enable more in-depth timings.
+        .filter_or("MY_LOG_LEVEL", "trace") // Change this from debug to trace to enable more in-depth timings.
         .write_style_or("MY_LOG_STYLE", "auto");
 
     env_logger::init_from_env(env);

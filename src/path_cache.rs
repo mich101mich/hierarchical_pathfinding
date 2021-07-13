@@ -5,16 +5,18 @@ use crate::{
     *,
 };
 
-use log::trace;
+#[cfg(feature = "log")]
 macro_rules! re_trace {
     ($msg: literal, $timer: ident) => {
         let now = std::time::Instant::now();
-        trace!(concat!("time to ", $msg, ": {:?}"), now - $timer);
-        #[allow(unused_assignments)]
-        {
-            $timer = now;
-        }
+        log::trace!(concat!("time to ", $msg, ": {:?}"), now - $timer);
+        #[allow(unused)]
+        let $timer = now;
     };
+}
+#[cfg(not(feature = "log"))]
+macro_rules! re_trace {
+    ($msg: literal, $timer: ident) => {};
 }
 
 mod cache_config;
@@ -142,6 +144,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         F1: Sync + Fn(Point) -> isize,
         F2: FnMut(Point) -> isize,
     {
+        #[cfg(feature = "log")]
+        let (outer_timer, timer) = (std::time::Instant::now(), std::time::Instant::now());
+
         // calculate chunk size
         let (num_chunks_w, last_width) = {
             let w = width / config.chunk_size;
@@ -193,6 +198,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                         ));
                     }
                 }
+
+                re_trace!("create chunks", timer);
+
                 chunks
             }
             #[cfg(not(feature = "parallel"))]
@@ -201,7 +209,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             CostFnWrapper::Parallel(get_cost) => {
                 use rayon::prelude::*;
 
-                let raw_chunks: Vec<(Chunk, NodeMap)> = (0..num_chunks_h * num_chunks_w)
+                let (mut chunks, node_maps): (Vec<_>, Vec<_>) = (0..num_chunks_h * num_chunks_w)
                     .into_par_iter()
                     .map(|index| {
                         let x = index % num_chunks_w;
@@ -235,13 +243,20 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                     })
                     .collect();
 
-                raw_chunks
-                    .into_iter()
+                re_trace!("create raw chunks", timer);
+
+                chunks
+                    .iter_mut()
+                    .zip(node_maps)
                     .map(|(mut chunk, new_nodes)| {
                         chunk.nodes = nodes.absorb(new_nodes);
                         chunk
                     })
-                    .to_vec()
+                    .to_vec();
+
+                re_trace!("absorb nodes", timer);
+
+                chunks
             }
         };
 
@@ -257,6 +272,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         // connect neighboring Nodes across Chunk borders
         cache.connect_nodes(None);
+
+        re_trace!("connect nodes", timer);
+        re_trace!("total time", outer_timer);
 
         cache
     }
@@ -409,8 +427,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         goal: Point,
         mut get_cost: impl FnMut(Point) -> isize,
     ) -> Option<AbstractPath<N>> {
-        let outer_timer = std::time::Instant::now();
-        let mut timer = outer_timer;
+        #[cfg(feature = "log")]
+        let (outer_timer, timer) = (std::time::Instant::now(), std::time::Instant::now());
 
         if get_cost(start) < 0 {
             // cannot start on a wall
@@ -469,7 +487,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 .map(|path| AbstractPath::from_known_path(neighborhood, path));
 
             re_trace!("A* fallback", timer);
-            trace!("total time: {:?}", std::time::Instant::now() - outer_timer);
+            re_trace!("total time", outer_timer);
 
             return res;
         }
@@ -477,6 +495,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         let mut paths = NodeIDMap::default();
         paths.insert(goal_id, path);
 
+        #[allow(clippy::let_and_return)]
         let res = self
             .resolve_paths(
                 start,
@@ -490,7 +509,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             .map(|(_, path)| path);
 
         re_trace!("resolve_paths", timer);
-        trace!("total time: {:?}", std::time::Instant::now() - outer_timer);
+        re_trace!("total time", outer_timer);
 
         res
     }
@@ -890,8 +909,8 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     {
         let size = self.config.chunk_size;
 
-        let outer_timer = std::time::Instant::now();
-        let mut timer = outer_timer;
+        #[cfg(feature = "log")]
+        let (outer_timer, timer) = (std::time::Instant::now(), std::time::Instant::now());
 
         let mut dirty = PointMap::default();
         for &p in tiles {
@@ -1127,7 +1146,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         self.connect_nodes(Some(changed_nodes));
 
         re_trace!("connect nodes", timer);
-        trace!("total time: {:?}", std::time::Instant::now() - outer_timer);
+        re_trace!("total time", outer_timer);
     }
 
     /// Allows for debugging and visualizing the PathCache
