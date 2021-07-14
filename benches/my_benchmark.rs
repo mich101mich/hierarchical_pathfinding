@@ -5,7 +5,6 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use hierarchical_pathfinding::prelude::*;
 use log::warn;
-use oorandom::Rand32;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Tile {
@@ -30,12 +29,14 @@ impl Map {
     }
 
     pub fn new_random(width: usize, height: usize) -> Self {
+        use nanorand::{Rng, WyRand};
+
         let tile_count = width * height;
         let mut tiles = Vec::with_capacity(tile_count);
-        let mut rng = Rand32::new(4);
+        let mut rng = WyRand::new_seed(4);
         for _ in 0..tile_count {
             tiles.push(Tile {
-                cost: rng.rand_range(0..10) as isize - 1,
+                cost: rng.generate_range(-1_isize..8),
             });
         }
         Map {

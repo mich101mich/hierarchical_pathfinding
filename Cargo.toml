@@ -25,11 +25,10 @@ log = { version = "0.4.14", optional = true }
 rayon = { version = "1.5", optional = true }
 
 [dev-dependencies]
-rand = { version = "0.8.4", features = ["std_rng"] }
 criterion = "0.3.4"
-oorandom = "11.1"
 env_logger = "0.8.4"
 log = "0.4.14"
+nanorand = "0.6"
 
 [[bench]]
 name = "my_benchmark"

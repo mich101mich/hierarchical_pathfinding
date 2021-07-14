@@ -1612,27 +1612,30 @@ mod tests {
     // #[test]
     #[cfg(feature = "parallel")]
     fn random_test() {
-        use rand::prelude::*;
+        use nanorand::Rng;
         use rayon::prelude::*;
-        let mut rng = StdRng::from_entropy();
 
         for &size in [8, 128, 1024].iter() {
             let mut grid = vec![vec![0; size]; size];
             grid.par_iter_mut().for_each(|row| {
-                let mut rng = StdRng::from_entropy();
-                row.fill_with(|| rng.gen_range(-2..7));
+                // let mut rng = StdRng::from_entropy();
+                let mut rng = nanorand::tls_rng();
+                row.fill_with(|| rng.generate_range(-2_isize..7));
             });
             let cost_fn = |(x, y): (usize, usize)| grid[y][x];
             for &chunk_size in [8, 16, 64].iter() {
+                println!("size: {}, chunk_size: {}", size, chunk_size);
                 let pathfinding = PathCache::new(
                     (size, size),
                     cost_fn,
                     ManhattanNeighborhood::new(size, size),
                     PathCacheConfig::with_chunk_size(chunk_size),
                 );
-                for _ in 0..100 {
-                    let start = (rng.gen_range(0..size), rng.gen_range(0..size));
-                    let goal = (rng.gen_range(0..size), rng.gen_range(0..size));
+                // for _ in 0..100 {
+                [0..100].par_iter().for_each(|_| {
+                    let mut rng = nanorand::tls_rng();
+                    let start = (rng.generate_range(0..size), rng.generate_range(0..size));
+                    let goal = (rng.generate_range(0..size), rng.generate_range(0..size));
                     let a_star_path = pathfinding.grid_a_star(start, goal, cost_fn);
                     let path = pathfinding.find_path(start, goal, cost_fn);
                     if a_star_path.is_some() != path.is_some() {
@@ -1652,7 +1655,8 @@ mod tests {
                         }
                         panic!("Failed");
                     }
-                }
+                });
+                // }
             }
         }
     }
