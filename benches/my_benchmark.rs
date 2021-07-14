@@ -233,7 +233,7 @@ fn bench_get_path(c: &mut Criterion) {
     for (size, iterations, name, start, goal) in [
         (128, 100, "Medium", (0, 0), (127, 127)),
         (256, 50, "Medium+", (1, 1), (200, 250)),
-        (512, 20, "Medium++", (10, 30), (500, 400)),
+        (512, 20, "Medium++", (20, 30), (500, 400)),
         (1024, 10, "Large", (40, 90), (900, 600)),
     ] {
         group.sample_size(iterations);
