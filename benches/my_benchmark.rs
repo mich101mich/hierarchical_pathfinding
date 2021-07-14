@@ -252,9 +252,12 @@ fn bench_get_path(c: &mut Criterion) {
             "Get Single Path, {} Uniform Map, Map Size: ({}, {}), Cache Size: {}",
             name, size, size, chunk_size
         );
-        log::trace!("");
-        log::trace!("{}", id);
-        log::trace!("");
+        #[cfg(feature = "log")]
+        {
+            log::trace!("");
+            log::trace!("{}", id);
+            log::trace!("");
+        }
         group.bench_function(&id, |b| {
             b.iter(|| pathcache.find_path(start, goal, map.cost_fn()))
         });
@@ -280,9 +283,12 @@ fn bench_get_path(c: &mut Criterion) {
             "Get Single Path, {} Random Map, Map Size: ({}, {}), Cache Size: {}",
             name, size, size, chunk_size
         );
-        log::trace!("");
-        log::trace!("{}", id);
-        log::trace!("");
+        #[cfg(feature = "log")]
+        {
+            log::trace!("");
+            log::trace!("{}", id);
+            log::trace!("");
+        }
         group.bench_function(&id, |b| {
             b.iter(|| pathcache.find_path(start, goal, map.cost_fn()))
         });

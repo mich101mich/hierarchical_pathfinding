@@ -1,5 +1,4 @@
-use crate::{Point, path::PathSegment};
-use super::{NodeID, NodeIDMap};
+use crate::{path::PathSegment, NodeID, NodeIDMap, Point};
 
 #[derive(Clone, Debug)]
 pub struct Node {

@@ -1,5 +1,5 @@
 use crate::{
-    graph::{self, Node, NodeID, NodeIDMap, NodeIDSet, NodeMap},
+    graph::{self, Node, NodeList},
     neighbors::Neighborhood,
     path::{AbstractPath, Cost, Path, PathSegment},
     *,
@@ -42,7 +42,7 @@ pub struct PathCache<N: Neighborhood> {
     height: usize,
     chunks: Vec<Chunk>,
     num_chunks: (usize, usize),
-    nodes: NodeMap,
+    nodes: NodeList,
     neighborhood: N,
     config: PathCacheConfig,
 }
@@ -167,7 +167,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             }
         };
 
-        let mut nodes = NodeMap::new();
+        let mut nodes = NodeList::new();
 
         // create chunks
         let chunks = match get_cost {
@@ -209,7 +209,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             CostFnWrapper::Parallel(get_cost) => {
                 use rayon::prelude::*;
 
-                let (mut chunks, node_maps): (Vec<_>, Vec<_>) = (0..num_chunks_h * num_chunks_w)
+                let (mut chunks, node_lists): (Vec<_>, Vec<_>) = (0..num_chunks_h * num_chunks_w)
                     .into_par_iter()
                     .map(|index| {
                         let x = index % num_chunks_w;
@@ -227,7 +227,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                             config.chunk_size
                         };
 
-                        let mut node_map = NodeMap::new();
+                        let mut node_list = NodeList::new();
 
                         let chunk = Chunk::new(
                             (x * config.chunk_size, y * config.chunk_size),
@@ -235,11 +235,11 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                             (width, height),
                             &get_cost,
                             &neighborhood,
-                            &mut node_map,
+                            &mut node_list,
                             config,
                         );
 
-                        (chunk, node_map)
+                        (chunk, node_list)
                     })
                     .collect();
 
@@ -247,7 +247,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
                 chunks
                     .iter_mut()
-                    .zip(node_maps)
+                    .zip(node_lists)
                     .map(|(mut chunk, new_nodes)| {
                         chunk.nodes = nodes.absorb(new_nodes);
                         chunk
@@ -1560,7 +1560,7 @@ mod tests {
         );
 
         grid[2][1] = 0;
-        let changed_tiles = [(1, 1)];
+        let changed_tiles = [(1, 2)];
 
         pathfinding.tiles_changed(&changed_tiles, cost_fn(&grid));
 

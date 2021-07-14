@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
 pub fn dijkstra_search(
-    nodes: &NodeMap,
+    nodes: &NodeList,
     start: NodeID,
     goals: &[NodeID],
     only_closest_goal: bool,

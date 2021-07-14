@@ -409,10 +409,21 @@
 //! See the [log](https://crates.io/crates/log) crate for more details.
 //!
 
+/// Shorthand for a 2D Point
 type Point = (usize, usize);
 
+/// A convenience type for a [`HashMap`](hashbrown::HashMap) using Points as the key
 type PointMap<V> = hashbrown::HashMap<Point, V>;
+/// A convenience type for a [`HashSet`](hashbrown::HashSet) with Points
 type PointSet = hashbrown::HashSet<Point>;
+
+/// The Type used to reference a Node in the abstracted Graph
+type NodeID = u32;
+
+/// A convenience type for a [`HashMap`](hashbrown::HashMap) using NodeIDs as the key
+type NodeIDMap<V> = hashbrown::HashMap<NodeID, V>;
+/// A convenience type for a [`HashSet`](hashbrown::HashSet) with NodeIDs
+type NodeIDSet = hashbrown::HashSet<NodeID>;
 
 mod path_cache;
 pub use self::path_cache::{PathCache, PathCacheConfig};

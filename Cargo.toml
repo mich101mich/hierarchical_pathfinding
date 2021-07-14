@@ -20,15 +20,14 @@ exclude = [
 ]
 
 [dependencies]
-hashbrown = "0.11.2"
 hashbrown = "0.11"
 log = { version = "0.4", optional = true }   # Feature used for measuring internal timings. Recommended to leave this off unless working on improvements to hierarchical_pathfinding.
-rayon = { version = "1.5", optional = true }
+rayon = { version = "1.5", optional = true }  # don't set this directly, use feature `parallel` instead.
 
 [dev-dependencies]
-criterion = "0.3.4"
-env_logger = "0.8.4"
-log = "0.4.14"
+criterion = "0.3"
+env_logger = "0.8"
+log = "0.4"
 nanorand = "0.6"
 
 [[bench]]

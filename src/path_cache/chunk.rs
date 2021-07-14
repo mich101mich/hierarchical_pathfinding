@@ -20,7 +20,7 @@ impl Chunk {
         total_size: (usize, usize),
         mut get_cost: impl FnMut(Point) -> isize,
         neighborhood: &N,
-        all_nodes: &mut NodeMap,
+        all_nodes: &mut NodeList,
         config: PathCacheConfig,
     ) -> Chunk {
         let mut chunk = Chunk {
@@ -176,7 +176,7 @@ impl Chunk {
         to_visit: &[NodeID],
         mut get_cost: impl FnMut(Point) -> isize,
         neighborhood: &N,
-        all_nodes: &mut NodeMap,
+        all_nodes: &mut NodeList,
         config: &PathCacheConfig,
     ) {
         // first to_visit, then the rest => slicing works the same on both lists
@@ -209,7 +209,7 @@ impl Chunk {
         &self,
         get_cost: F1,
         neighborhood: &N,
-        all_nodes: &NodeMap,
+        all_nodes: &NodeList,
         cache_paths: bool,
     ) -> Vec<(NodeID, NodeID, PathSegment)> {
         use rayon::prelude::*;
@@ -270,7 +270,7 @@ impl Chunk {
 
     pub fn nearest_node<N: Neighborhood>(
         &self,
-        all_nodes: &NodeMap,
+        all_nodes: &NodeList,
         start: Point,
         mut get_cost: impl FnMut(Point) -> isize,
         neighborhood: &N,
