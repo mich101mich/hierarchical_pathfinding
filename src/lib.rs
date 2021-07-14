@@ -95,7 +95,7 @@
 //!     (width, height),   // the size of the Grid
 //!     |(x, y)| cost_map[grid[y][x]],   // get the cost for walking over a Tile
 //!     ManhattanNeighborhood::new(width, height),   // the Neighborhood
-//!     PathCacheConfig { chunk_size: 3, ..Default::default() },   // config
+//!     PathCacheConfig::with_chunk_size(3),   // config
 //! );
 //! ```
 //! The [`PathCache`] never takes the actual Grid, to allow for any storage format to be used
@@ -392,6 +392,22 @@
 //!
 //! assert_eq!(pathfinding.config().chunk_size, 3);
 //! ```
+//! # Cargo Features
+//! ##### parallel
+//! Enabled by default.
+//!
+//! The parallel feature causes [`PathCache`] creation and updates to be multithreaded using [Rayon](https://crates.io/crates/rayon), making them significantly faster.
+//! This feature has no effect on the speed of finding paths.
+//!
+//! ##### log
+//! Disabled by default.
+//!
+//! The log feature is used to enable internal timings on some functions.
+//!
+//! You probably shouldn't enable this feature unless you are working on improvments to hierarchical_pathfinding.
+//! In order to comsume the logs, you need a logger setup to show trace! level logs.
+//! See the [log](https://crates.io/crates/log) crate for more details.
+//!
 
 type Point = (usize, usize);
 
