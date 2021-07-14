@@ -3,8 +3,8 @@
 /// The Type used to reference a Node in the abstracted Graph
 pub type NodeID = u32;
 
-/// A specialized [`HashMap`](std::collections::HashMap) for NodeIDs with a faster Hasher
+/// A convenience type for a [`HashMap`](hashbrown::HashMap) using NodeIDs as the key
 pub type NodeIDMap<V> = hashbrown::HashMap<NodeID, V>;
 
-/// A specialized [`HashSet`](std::collections::HashSet) for NodeIDs with a faster Hasher
+/// A convenience type for a [`HashSet`](hashbrown::HashSet) with NodeIDs
 pub type NodeIDSet = hashbrown::HashSet<NodeID>;
