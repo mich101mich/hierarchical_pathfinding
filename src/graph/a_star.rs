@@ -4,17 +4,18 @@ use crate::neighbors::Neighborhood;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-pub fn a_star_search(
-    nodes: &NodeMap,
+pub fn a_star_search<N: Neighborhood>(
+    nodes: &NodeList,
     start: NodeID,
     goal: NodeID,
-    neigh: &impl Neighborhood,
+    neighborhood: &N,
+    size_hint: usize,
 ) -> Option<Path<NodeID>> {
     if start == goal {
         return Some(Path::from_slice(&[start, start], 0));
     }
-    let mut visited = NodeIDMap::default();
-    let mut next = BinaryHeap::new();
+    let mut visited = NodeIDMap::with_capacity(size_hint);
+    let mut next = BinaryHeap::with_capacity(size_hint / 2);
     next.push(HeuristicElement(start, 0, 0));
     visited.insert(start, (0, start));
 
@@ -47,7 +48,7 @@ pub fn a_star_search(
             }
 
             if needs_visit {
-                let heuristic = neigh.heuristic(current.pos, other.pos);
+                let heuristic = neighborhood.heuristic(current.pos, other.pos);
                 next.push(HeuristicElement(
                     other_id,
                     other_cost,

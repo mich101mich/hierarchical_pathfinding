@@ -2,19 +2,24 @@ use super::{Node, NodeID, NodeIDMap, NodeIDSet};
 use crate::{path::PathSegment, Point, PointMap};
 
 #[derive(Clone, Debug)]
-pub struct NodeMap {
+pub struct NodeList {
     nodes: Vec<Option<Node>>,
     pos_map: PointMap<NodeID>,
     next_id: usize,
 }
 
-impl NodeMap {
-    pub fn new() -> NodeMap {
-        NodeMap {
+impl NodeList {
+    pub fn new() -> Self {
+        Self {
             nodes: Vec::new(),
             pos_map: PointMap::default(),
             next_id: 0,
         }
+    }
+
+    #[allow(unused)]
+    pub fn len(&self) -> usize {
+        self.pos_map.len()
     }
 
     pub fn add_node(&mut self, pos: Point, walk_cost: usize) -> NodeID {
@@ -56,6 +61,7 @@ impl NodeMap {
             self[other_id].edges.remove(&id);
         }
         self.pos_map.remove(&node.pos);
+        self.next_id = self.next_id.min(id as usize);
     }
 
     #[allow(unused)]
@@ -72,6 +78,8 @@ impl NodeMap {
             .filter(|(_, opt)| opt.is_some())
             .map(|(id, _)| id as NodeID)
     }
+
+    #[allow(unused)]
     pub fn values(&self) -> impl Iterator<Item = &Node> + '_ {
         self.nodes.iter().filter_map(|opt| opt.as_ref())
     }
@@ -80,7 +88,8 @@ impl NodeMap {
         self.pos_map.get(&pos).copied()
     }
 
-    pub fn absorb(&mut self, other: NodeMap) -> NodeIDSet {
+    #[allow(unused)]
+    pub fn absorb(&mut self, other: NodeList) -> NodeIDSet {
         let mut ret = NodeIDSet::default();
         let mut map = NodeIDMap::default();
 
@@ -96,7 +105,7 @@ impl NodeMap {
             new_node.edges = old_node
                 .edges
                 .into_iter()
-                .map(|(other_id, path)| (map.get(&other_id).copied().unwrap_or(other_id), path))
+                .map(|(other_id, path)| (map[&other_id], path))
                 .collect();
         }
 
@@ -105,14 +114,14 @@ impl NodeMap {
 }
 
 use std::ops::{Index, IndexMut};
-impl Index<NodeID> for NodeMap {
+impl Index<NodeID> for NodeList {
     type Output = Node;
     #[track_caller]
     fn index(&self, index: NodeID) -> &Node {
         self.nodes[index as usize].as_ref().unwrap()
     }
 }
-impl IndexMut<NodeID> for NodeMap {
+impl IndexMut<NodeID> for NodeList {
     #[track_caller]
     fn index_mut(&mut self, index: NodeID) -> &mut Node {
         self.nodes[index as usize].as_mut().unwrap()
@@ -121,7 +130,7 @@ impl IndexMut<NodeID> for NodeMap {
 
 #[test]
 fn absorb() {
-    let mut nodes = NodeMap::new();
+    let mut nodes = NodeList::new();
     nodes.add_node((0, 0), 0);
     nodes.add_node((1, 1), 1);
     nodes.add_node((2, 2), 2);
@@ -136,7 +145,7 @@ fn absorb() {
         PathSegment::new(super::Path::from_slice(&[], 2), true),
     );
 
-    let mut new_nodes = NodeMap::new();
+    let mut new_nodes = NodeList::new();
     new_nodes.add_node((10, 10), 10);
     new_nodes.add_node((11, 11), 11);
     new_nodes.add_edge(

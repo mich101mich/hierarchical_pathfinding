@@ -11,18 +11,19 @@ pub fn dijkstra_search<N: Neighborhood>(
     start: Point,
     goals: &[Point],
     only_closest_goal: bool,
+    size_hint: usize,
 ) -> PointMap<Path<Point>> {
     if get_cost(start) < 0 {
         return PointMap::default();
     }
-    let mut visited = PointMap::default();
-    let mut next = BinaryHeap::new();
+    let mut visited = PointMap::with_capacity(size_hint);
+    let mut next = BinaryHeap::with_capacity(size_hint / 2);
     next.push(Element(start, 0));
     visited.insert(start, (0, start));
 
     let mut remaining_goals: PointSet = goals.iter().copied().collect();
 
-    let mut goal_costs = PointMap::with_capacity_and_hasher(goals.len(), Default::default());
+    let mut goal_costs = PointMap::with_capacity(goals.len());
 
     let mut all_neighbors = vec![];
 
@@ -133,6 +134,7 @@ mod tests {
             start,
             &goals,
             false,
+            40,
         );
 
         // (4, 4) is reachable

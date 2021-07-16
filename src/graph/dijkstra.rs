@@ -4,19 +4,20 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
 pub fn dijkstra_search(
-    nodes: &NodeMap,
+    nodes: &NodeList,
     start: NodeID,
     goals: &[NodeID],
     only_closest_goal: bool,
+    size_hint: usize,
 ) -> NodeIDMap<Path<NodeID>> {
-    let mut visited = NodeIDMap::default();
-    let mut next = BinaryHeap::new();
+    let mut visited = NodeIDMap::with_capacity(size_hint);
+    let mut next = BinaryHeap::with_capacity(size_hint / 2);
     next.push(Element(start, 0));
     visited.insert(start, (0, start));
 
     let mut remaining_goals: NodeIDSet = goals.iter().copied().collect();
 
-    let mut goal_costs = NodeIDMap::with_capacity_and_hasher(goals.len(), Default::default());
+    let mut goal_costs = NodeIDMap::with_capacity(goals.len());
 
     while let Some(Element(current_id, current_cost)) = next.pop() {
         match current_cost.cmp(&visited[&current_id].0) {

@@ -95,7 +95,7 @@
 //!     (width, height),   // the size of the Grid
 //!     |(x, y)| cost_map[grid[y][x]],   // get the cost for walking over a Tile
 //!     ManhattanNeighborhood::new(width, height),   // the Neighborhood
-//!     PathCacheConfig { chunk_size: 3, ..Default::default() },   // config
+//!     PathCacheConfig::with_chunk_size(3),   // config
 //! );
 //! ```
 //! The [`PathCache`] never takes the actual Grid, to allow for any storage format to be used
@@ -121,7 +121,7 @@
 //! const COST_MAP: [isize; 3] = [1, 10, -1]; // now const for ownership reasons
 //!
 //! // only borrows the Grid when called
-//! fn cost_fn(grid: &Grid) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! fn cost_fn(grid: &Grid) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //!     move |(x, y)| COST_MAP[grid[y][x]]
 //! }
 //!
@@ -132,7 +132,7 @@
 //!     cost_fn(&grid),
 //!     // ...
 //! #     ManhattanNeighborhood::new(width, height), // the Neighborhood
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() }, // config
+//! #     PathCacheConfig::with_chunk_size(3), // config
 //! # );
 //! ```
 //!
@@ -148,14 +148,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! #
 //! let start = (0, 0);
@@ -186,14 +186,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! #
 //! let start = (0, 0);
@@ -245,14 +245,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! # struct Player{ pos: (usize, usize) }
 //! # impl Player {
@@ -302,14 +302,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! #
 //! let (start, goal) = ((0, 0), (2, 0));
@@ -334,14 +334,14 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //! # let mut pathfinding = PathCache::new(
 //! #     (width, height),
 //! #     cost_fn(&grid),
 //! #     ManhattanNeighborhood::new(width, height),
-//! #     PathCacheConfig { chunk_size: 3, ..Default::default() },
+//! #     PathCacheConfig::with_chunk_size(3),
 //! # );
 //! #
 //! let (start, goal) = ((0, 0), (2, 0));
@@ -376,7 +376,7 @@
 //! #     [0, 0, 0, 2, 0],
 //! # ];
 //! # let (width, height) = (grid.len(), grid[0].len());
-//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + FnMut((usize, usize)) -> isize {
+//! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
 //!
@@ -392,11 +392,38 @@
 //!
 //! assert_eq!(pathfinding.config().chunk_size, 3);
 //! ```
+//! # Cargo Features
+//! ##### parallel
+//! Enabled by default.
+//!
+//! The parallel feature causes [`PathCache`] creation and updates to be multithreaded using [Rayon](https://crates.io/crates/rayon), making them significantly faster.
+//! This feature has no effect on the speed of finding paths.
+//!
+//! ##### log
+//! Disabled by default.
+//!
+//! The log feature is used to enable internal timings on some functions.
+//!
+//! You probably shouldn't enable this feature unless you are working on improvments to hierarchical_pathfinding.
+//! In order to comsume the logs, you need a logger setup to show trace! level logs.
+//! See the [log](https://crates.io/crates/log) crate for more details.
+//!
 
+/// Shorthand for a 2D Point
 type Point = (usize, usize);
 
-type PointMap<V> = std::collections::HashMap<Point, V, fnv::FnvBuildHasher>;
-type PointSet = std::collections::HashSet<Point, fnv::FnvBuildHasher>;
+/// A convenience type for a [`HashMap`](hashbrown::HashMap) using Points as the key
+type PointMap<V> = hashbrown::HashMap<Point, V>;
+/// A convenience type for a [`HashSet`](hashbrown::HashSet) with Points
+type PointSet = hashbrown::HashSet<Point>;
+
+/// The Type used to reference a Node in the abstracted Graph
+type NodeID = u32;
+
+/// A convenience type for a [`HashMap`](hashbrown::HashMap) using NodeIDs as the key
+type NodeIDMap<V> = hashbrown::HashMap<NodeID, V>;
+/// A convenience type for a [`HashSet`](hashbrown::HashSet) with NodeIDs
+type NodeIDSet = hashbrown::HashSet<NodeID>;
 
 mod path_cache;
 pub use self::path_cache::{PathCache, PathCacheConfig};

@@ -1,5 +1,5 @@
 use crate::{
-    graph::{NodeID, NodeIDSet, NodeMap},
+    graph::*,
     neighbors::Neighborhood,
     path::{Path, PathSegment},
     *,
@@ -20,7 +20,7 @@ impl Chunk {
         total_size: (usize, usize),
         mut get_cost: impl FnMut(Point) -> isize,
         neighborhood: &N,
-        all_nodes: &mut NodeMap,
+        all_nodes: &mut NodeList,
         config: PathCacheConfig,
     ) -> Chunk {
         let mut chunk = Chunk {
@@ -50,7 +50,7 @@ impl Chunk {
             .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
             .to_vec();
 
-        chunk.add_nodes(nodes, &mut get_cost, neighborhood, all_nodes, config);
+        chunk.add_nodes(&nodes, &mut get_cost, neighborhood, all_nodes, &config);
 
         chunk
     }
@@ -173,16 +173,16 @@ impl Chunk {
 
     pub fn add_nodes<N: Neighborhood>(
         &mut self,
-        mut to_visit: Vec<NodeID>,
+        to_visit: &[NodeID],
         mut get_cost: impl FnMut(Point) -> isize,
         neighborhood: &N,
-        all_nodes: &mut NodeMap,
-        config: PathCacheConfig,
+        all_nodes: &mut NodeList,
+        config: &PathCacheConfig,
     ) {
-        let mut points = self
-            .nodes
+        // first to_visit, then the rest => slicing works the same on both lists
+        let points = to_visit
             .iter()
-            .chain(to_visit.iter()) // results in to_visit points at the end => enables pop()
+            .chain(self.nodes.iter())
             .map(|id| all_nodes[*id].pos)
             .to_vec();
 
@@ -190,14 +190,10 @@ impl Chunk {
             self.nodes.insert(id);
         }
 
-        // connect every Node to every other Node
-        while let Some(id) = to_visit.pop() {
-            let point = points
-                .pop()
-                .expect("Internal Error #4 in Chunk. Please report this");
-
-            let paths = self.find_paths(point, &points, &mut get_cost, neighborhood);
-
+        for (i, &id) in to_visit.iter().enumerate() {
+            let point = points[i];
+            let remaining = &points[(i + 1)..];
+            let paths = self.find_paths(point, remaining, &mut get_cost, neighborhood);
             for (other_pos, path) in paths {
                 let other_id = all_nodes
                     .id_at(other_pos)
@@ -206,6 +202,41 @@ impl Chunk {
                 all_nodes.add_edge(id, other_id, PathSegment::new(path, config.cache_paths));
             }
         }
+    }
+
+    #[cfg(feature = "parallel")]
+    pub fn connect_nodes_parallel<N: Neighborhood + Sync, F1: Fn(Point) -> isize + Sync>(
+        &self,
+        get_cost: F1,
+        neighborhood: &N,
+        all_nodes: &NodeList,
+        cache_paths: bool,
+    ) -> Vec<(NodeID, NodeID, PathSegment)> {
+        use rayon::prelude::*;
+
+        let mut ids = Vec::with_capacity(self.nodes.len());
+        let mut points = Vec::with_capacity(self.nodes.len());
+        for (i, &id) in self.nodes.iter().enumerate() {
+            ids.push((i, id));
+            points.push(all_nodes[id].pos);
+        }
+
+        // connect every Node to every other Node
+        ids.par_iter()
+            .flat_map(|&(i, id)| {
+                let point = points[i];
+                let remaining = &points[(i + 1)..];
+                self.find_paths(point, remaining, &get_cost, neighborhood)
+                    .into_par_iter()
+                    .map(move |(other_pos, path)| {
+                        let other_id = all_nodes
+                            .id_at(other_pos)
+                            .expect("Internal Error #5 in Chunk. Please report this");
+
+                        (id, other_id, PathSegment::new(path, cache_paths))
+                    })
+            })
+            .collect()
     }
 
     pub fn find_paths<N: Neighborhood>(
@@ -218,6 +249,14 @@ impl Chunk {
         if !self.in_chunk(start) {
             return PointMap::default();
         }
+        let heuristic = goals
+            .iter()
+            .map(|goal| neighborhood.heuristic(start, *goal))
+            .max()
+            .unwrap_or(0);
+        let max_heuristic = neighborhood.heuristic((0, 0), (self.size.0 - 1, self.size.1 - 1));
+        let max_size = self.size.0 * self.size.1;
+        let size_hint = heuristic as f32 / max_heuristic as f32 * max_size as f32;
         grid::dijkstra_search(
             neighborhood,
             |p| self.in_chunk(p),
@@ -225,12 +264,13 @@ impl Chunk {
             start,
             goals,
             false,
+            size_hint as usize,
         )
     }
 
     pub fn nearest_node<N: Neighborhood>(
         &self,
-        all_nodes: &NodeMap,
+        all_nodes: &NodeList,
         start: Point,
         mut get_cost: impl FnMut(Point) -> isize,
         neighborhood: &N,
@@ -241,23 +281,25 @@ impl Chunk {
             if !reverse {
                 return None;
             }
-            self.nodes
-                .iter()
-                .copied()
-                .filter_map(|id| {
-                    self.find_path(all_nodes[id].pos, start, &mut get_cost, neighborhood)
-                        .map(|path| (id, path))
-                })
-                .min_by_key(|(_, path)| path.cost())
+            self.nodes.iter().copied().find_map(|id| {
+                self.find_path(all_nodes[id].pos, start, &mut get_cost, neighborhood)
+                    .map(|path| (id, path))
+            })
         } else {
             let mut points = Vec::with_capacity(self.nodes.len());
             let mut map = PointMap::default();
+            let max_heuristic = neighborhood.heuristic((0, 0), (self.size.0 - 1, self.size.1 - 1));
+            let mut min_heuristic = max_heuristic;
             for id in self.nodes.iter() {
                 let node = &all_nodes[*id];
                 let point = node.pos;
                 points.push(point);
                 map.insert(point, (*id, node.walk_cost));
+                min_heuristic = min_heuristic.min(neighborhood.heuristic(start, point));
             }
+
+            let max_size = self.size.0 * self.size.1;
+            let size_hint = min_heuristic as f32 / max_heuristic as f32 * max_size as f32;
             grid::dijkstra_search(
                 neighborhood,
                 |p| self.in_chunk(p),
@@ -265,6 +307,7 @@ impl Chunk {
                 start,
                 &points,
                 true,
+                size_hint as usize,
             )
             .into_iter()
             .next()
@@ -291,7 +334,19 @@ impl Chunk {
         if !self.in_chunk(start) || !self.in_chunk(goal) {
             return None;
         }
-        grid::a_star_search(neighborhood, |p| self.in_chunk(p), get_cost, start, goal)
+        let heuristic = neighborhood.heuristic(start, goal);
+        let max_heuristic = neighborhood.heuristic((0, 0), (self.size.0 - 1, self.size.1 - 1));
+        let max_size = self.size.0 * self.size.1;
+        let size_hint = heuristic as f32 / max_heuristic as f32 * max_size as f32;
+
+        grid::a_star_search(
+            neighborhood,
+            |p| self.in_chunk(p),
+            get_cost,
+            start,
+            goal,
+            size_hint as usize,
+        )
     }
 
     pub fn in_chunk(&self, point: Point) -> bool {
