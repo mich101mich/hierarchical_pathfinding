@@ -397,7 +397,7 @@
 //! Enabled by default.
 //!
 //! The parallel feature causes [`PathCache`] creation and updates to be multithreaded using [Rayon](https://crates.io/crates/rayon), making them significantly faster.
-//! This feature has no effect on the speed of finding paths.
+//! This feature has no effect on the speed of finding paths (_yet_).
 //!
 //! ##### log
 //! Disabled by default.

@@ -134,6 +134,28 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         )
     }
 
+    /// Same as [`new`](PathCache::new), ~~but uses multiple threads.~~
+    ///
+    /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
+    #[cfg(feature = "parallel")]
+    #[deprecated(
+        since = "0.5.0",
+        note = "`new` is automatically parallel"
+    )]
+    pub fn new_parallel<F: Sync + Fn(Point) -> isize>(
+        (width, height): (usize, usize),
+        get_cost: F,
+        neighborhood: N,
+        config: PathCacheConfig,
+    ) -> PathCache<N> {
+        PathCache::new_internal::<F, fn(Point) -> isize>(
+            (width, height),
+            CostFnWrapper::Parallel(get_cost),
+            neighborhood,
+            config,
+        )
+    }
+
     fn new_internal<F1, F2>(
         (width, height): (usize, usize),
         get_cost: CostFnWrapper<F1, F2>,
