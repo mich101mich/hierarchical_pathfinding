@@ -45,7 +45,7 @@ impl Chunk {
             chunk.calculate_side_nodes(dir, total_size, &mut get_cost, config, &mut candidates);
         }
 
-        let nodes: Vec<NodeID> = candidates
+        let nodes = candidates
             .into_iter()
             .map(|p| all_nodes.add_node(p, get_cost(p) as usize))
             .to_vec();

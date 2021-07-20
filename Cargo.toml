@@ -10,13 +10,11 @@ license = "MIT"
 keywords = ["pathfinding", "dijkstra", "a-star", "grid"]
 categories = ["algorithms"]
 exclude = [
-    "/.vscode/*",
-    "/todo.md",
-    "/.gitignore",
     "/.github/*",
-    "/benchmark/*",
-    "/img/*",
+    "/.vscode/*",
     "/benches/*",
+    "/img/*",
+    "/.gitignore",
 ]
 
 [dependencies]
@@ -30,11 +28,10 @@ env_logger = "0.8"
 log = "0.4"
 nanorand = "0.6"
 
-[[bench]]
-name = "my_benchmark"
-harness = false
-
-
 [features]
 default = ["parallel"]
 parallel = ["rayon", "hashbrown/rayon"]
+
+[[bench]]
+name = "my_benchmark"
+harness = false

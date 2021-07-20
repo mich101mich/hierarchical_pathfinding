@@ -410,12 +410,12 @@ type Cost = usize;
 #[derive(PartialEq, Eq)]
 pub struct HeuristicElement<Id>(pub Id, pub Cost, pub Cost);
 impl<Id: Eq> PartialOrd for HeuristicElement<Id> {
-    fn partial_cmp(&self, rhs: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
         Some(self.cmp(rhs))
     }
 }
 impl<Id: Eq> Ord for HeuristicElement<Id> {
-    fn cmp(&self, rhs: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, rhs: &Self) -> Ordering {
         rhs.2.cmp(&self.2)
     }
 }

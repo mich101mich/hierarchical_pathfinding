@@ -5,6 +5,9 @@ use crate::{
     *,
 };
 
+use std::marker::PhantomData;
+
+// a Macro to log::trace the time since $timer, and restart $timer
 #[cfg(feature = "log")]
 macro_rules! re_trace {
     ($msg: literal, $timer: ident) => {
@@ -16,6 +19,7 @@ macro_rules! re_trace {
 }
 #[cfg(not(feature = "log"))]
 macro_rules! re_trace {
+    // does nothing without log feature
     ($msg: literal, $timer: ident) => {};
 }
 
@@ -27,12 +31,12 @@ use chunk::Chunk;
 
 enum CostFnWrapper<F1, F2>
 where
-    F1: Fn(Point) -> isize,
+    F1: Sync + Fn(Point) -> isize,
     F2: FnMut(Point) -> isize,
 {
-    #[allow(unused)]
+    Sequential(F2, PhantomData<F1>), // F1 has to appear in the enum even if `parallel` is disabled
+    #[cfg(feature = "parallel")]
     Parallel(F1),
-    Sequential(F2),
 }
 
 /// A struct to store the Hierarchical Pathfinding information.
@@ -108,7 +112,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         {
             PathCache::new_internal::<fn(Point) -> isize, F>(
                 (width, height),
-                CostFnWrapper::Sequential(get_cost),
+                CostFnWrapper::Sequential(get_cost, PhantomData),
                 neighborhood,
                 config,
             )
@@ -128,7 +132,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ) -> PathCache<N> {
         PathCache::new_internal::<fn(Point) -> isize, F>(
             (width, height),
-            CostFnWrapper::Sequential(get_cost),
+            CostFnWrapper::Sequential(get_cost, Default::default()),
             neighborhood,
             config,
         )
@@ -138,10 +142,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ///
     /// Note that `get_cost` has to be `Fn` instead of `FnMut`.
     #[cfg(feature = "parallel")]
-    #[deprecated(
-        since = "0.5.0",
-        note = "`new` is automatically parallel"
-    )]
+    #[deprecated(since = "0.5.0", note = "`new` is automatically parallel")]
     pub fn new_parallel<F: Sync + Fn(Point) -> isize>(
         (width, height): (usize, usize),
         get_cost: F,
@@ -193,7 +194,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         // create chunks
         let chunks = match get_cost {
-            CostFnWrapper::Sequential(mut get_cost) => {
+            CostFnWrapper::Sequential(mut get_cost, _) => {
                 let mut chunks: Vec<Chunk> = Vec::with_capacity(num_chunks_w * num_chunks_h);
                 for y in 0..num_chunks_h {
                     let h = if y == num_chunks_h - 1 {
@@ -225,8 +226,6 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
                 chunks
             }
-            #[cfg(not(feature = "parallel"))]
-            _ => panic!("Created a Parallel CostFnWrapper in a non-parallel environment"),
             #[cfg(feature = "parallel")]
             CostFnWrapper::Parallel(get_cost) => {
                 use rayon::prelude::*;
@@ -900,7 +899,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         {
             self.tiles_changed_internal::<fn(Point) -> isize, F>(
                 tiles,
-                CostFnWrapper::Sequential(get_cost),
+                CostFnWrapper::Sequential(get_cost, PhantomData),
             )
         }
     }
@@ -917,7 +916,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ) {
         self.tiles_changed_internal::<fn(Point) -> isize, F>(
             tiles,
-            CostFnWrapper::Sequential(get_cost),
+            CostFnWrapper::Sequential(get_cost, PhantomData),
         )
     }
 
@@ -1036,11 +1035,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         {
             let mut get_cost: &mut dyn FnMut(Point) -> isize = match &mut get_cost {
-                CostFnWrapper::Sequential(get_cost) => get_cost,
+                CostFnWrapper::Sequential(get_cost, _) => get_cost,
                 #[cfg(feature = "parallel")]
                 CostFnWrapper::Parallel(get_cost) => get_cost,
-                #[cfg(not(feature = "parallel"))]
-                _ => panic!("Created a Parallel CostFnWrapper in a non-parallel environment"),
             };
 
             // recreate sides in renew
@@ -1097,7 +1094,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         re_trace!("recreates sides in renew", timer);
 
         match get_cost {
-            CostFnWrapper::Sequential(mut get_cost) => {
+            CostFnWrapper::Sequential(mut get_cost, _) => {
                 for cp in dirty.keys() {
                     let chunk_index = self.get_chunk_index(*cp);
                     let chunk = &mut self.chunks[chunk_index];
@@ -1118,8 +1115,6 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 }
                 re_trace!("recreate Paths", timer);
             }
-            #[cfg(not(feature = "parallel"))]
-            _ => panic!("Created a Parallel CostFnWrapper in a non-parallel environment"),
             #[cfg(feature = "parallel")]
             CostFnWrapper::Parallel(get_cost) => {
                 use rayon::prelude::*;

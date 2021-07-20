@@ -96,7 +96,7 @@ pub fn jump_in_dir(
         pos.0 as isize + diff.0 * dist,
         pos.1 as isize + diff.1 * dist,
     );
-    if (res.0 >= left && res.0 < right && res.1 >= top && res.1 < bottom) {
+    if res.0 >= left && res.0 < right && res.1 >= top && res.1 < bottom {
         Some((res.0 as usize, res.1 as usize))
     } else {
         None
