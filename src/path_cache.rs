@@ -1350,7 +1350,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                     // len() - 2 because skip(1) already removes one
                     continue;
                 }
-                final_path.add_path_segment(self.nodes[*a].edges[&b].clone());
+                final_path.add_path_segment(self.nodes[*a].edges[b].clone());
             }
 
             if skip_last {
