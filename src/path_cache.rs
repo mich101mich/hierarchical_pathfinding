@@ -269,7 +269,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 chunks
                     .iter_mut()
                     .zip(node_lists)
-                    .map(|(mut chunk, new_nodes)| {
+                    .map(|(chunk, new_nodes)| {
                         chunk.nodes = nodes.absorb(new_nodes);
                         chunk
                     })
@@ -500,39 +500,23 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 
         re_trace!("graph::a_star_search", timer);
 
-        if path.len() == 2 || (self.config.a_star_fallback && path.len() <= 4) {
-            // 2: start_id == goal_id
-            // <= 4: start_id X X goal_id
-            let res = self
-                .grid_a_star(start, goal, get_cost)
-                .map(|path| AbstractPath::from_known_path(neighborhood, path));
-
-            re_trace!("A* fallback", timer);
-            re_trace!("total time", outer_timer);
-
-            return res;
-        }
-
         let mut paths = NodeIDMap::default();
         paths.insert(goal_id, path);
 
-        #[allow(clippy::let_and_return)]
-        let res = self
-            .resolve_paths(
-                start,
-                start_path,
-                &[(goal, goal_id, goal_path)],
-                &paths,
-                get_cost,
-            )
-            .into_iter()
-            .next()
-            .map(|(_, path)| path);
+        let mut ret_map = PointMap::default();
+        self.resolve_paths(
+            start,
+            start_path,
+            &mut [(goal, goal_id, goal_path)],
+            &paths,
+            get_cost,
+            &mut ret_map,
+        );
 
         re_trace!("resolve_paths", timer);
         re_trace!("total time", outer_timer);
 
-        res
+        ret_map.remove(&goal)
     }
 
     /// Calculates the Paths from one `start` to several `goals` on the Grid.
@@ -737,6 +721,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         goals: &[Point],
         get_cost: impl FnMut(Point) -> isize,
     ) -> Option<(Point, AbstractPath<N>)> {
+        // TODO: bound check goals
         self.find_paths_internal(start, goals, get_cost, true)
             .into_iter()
             .next()
@@ -827,7 +812,15 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             size_hint as usize,
         );
 
-        self.resolve_paths(start, start_path, &goal_data, &paths, get_cost)
+        self.resolve_paths(
+            start,
+            start_path,
+            &mut goal_data,
+            &paths,
+            get_cost,
+            &mut ret,
+        );
+        ret
     }
 
     /// Notifies the PathCache that the Grid changed.
@@ -1299,12 +1292,14 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         &self,
         start: Point,
         start_path: Option<Path<Point>>,
-        goal_data: &[(Point, NodeID, Option<Path<Point>>)],
+        goal_data: &mut [(Point, NodeID, Option<Path<Point>>)],
         paths: &NodeIDMap<Path<NodeID>>,
         mut get_cost: impl FnMut(Point) -> isize,
-    ) -> PointMap<AbstractPath<N>> {
+        out: &mut PointMap<AbstractPath<N>>,
+    ) {
+        // a map for direct paths from the start to other nodes in the same chunk as start.
+        // see `start_path` calculation below
         let mut start_path_map = PointMap::default();
-        let mut ret = PointMap::default();
 
         for (goal, goal_id, goal_path) in goal_data {
             let path = if let Some(path) = paths.get(goal_id) {
@@ -1313,59 +1308,107 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 continue;
             };
 
+            if path.len() == 1
+                || (self.config.a_star_fallback && path.cost() < 2 * self.config.chunk_size)
+            {
+                // len == 1: start_id == goal_id
+                let res = self
+                    .grid_a_star(start, *goal, &mut get_cost)
+                    .map(|path| AbstractPath::from_known_path(self.neighborhood.clone(), path))
+                    .expect("Inconsistency in Pathfinding");
+
+                out.insert(*goal, res);
+                continue;
+            }
+
+            let path = path.iter().copied().to_vec();
+            let mut path = path.as_slice();
+
             let mut start_path = start_path.as_ref();
-            let mut skip_first = false;
-            let mut skip_last = false;
-            if start_path.is_some() {
-                let after_start = self.nodes[path[1]].pos;
-                if self.same_chunk(start, after_start) {
-                    start_path = Some(start_path_map.entry(after_start).or_insert_with(|| {
-                        // this is contained within a chunk, because start_path is contained and
-                        // (start_id, after_start) must be contained:
-                        // Direct paths between nodes are only added in chunk::(connect/add)_nodes,
-                        // or in the cross-chunk connect_nodes
-                        self.get_chunk(start)
-                            .find_path(start, after_start, &mut get_cost, &self.neighborhood)
-                            .expect("Inconsistency in Pathfinding")
-                    }));
-                    skip_first = true;
-                }
-            }
-
-            // path: ... -> before_goal (len-2) -> goal_id (len-1) (-> actual goal (would be next))
-            // check if direct connection of before_goal -> actual goal is feasible
-            let before_goal = self.nodes[path[path.len() - 2]].pos;
-            if goal_path.is_some() && self.same_chunk(*goal, before_goal) {
-                skip_last = true;
-            }
-
-            let mut final_path = if let Some(path) = start_path {
-                AbstractPath::from_known_path(self.neighborhood.clone(), path.clone())
+            if start_path.is_none() {
+                // start is itself a node, so leave the start as is
             } else {
-                AbstractPath::new(self.neighborhood.clone(), start)
-            };
+                // start_path connects start to *some* node in the chunk, which is not necessarily
+                // the best node to start from.
+                // => find a direct path to the node furthest into the path that is still in the
+                //    same chunk as start
+                let candidate = path
+                    .iter()
+                    .map(|&id| self.nodes[id].pos)
+                    .chain(std::iter::once(*goal))
+                    .enumerate()
+                    .skip(1) // skip the current candidate
+                    .take_while(|(_, pos)| self.same_chunk(start, *pos))
+                    .last();
 
-            for (i, (a, b)) in path.iter().zip(path.iter().skip(1)).enumerate() {
-                if (skip_first && i == 0) || (skip_last && i == path.len() - 2) {
-                    // len() - 2 because skip(1) already removes one
-                    continue;
+                if let Some((index, next_pos)) = candidate {
+                    let new_start_path = start_path_map.entry(next_pos).or_insert_with(|| {
+                        // this path is guaranteed to be within this chunk, because all nodes
+                        // between start and candidate are in the same chunk as start
+                        // and paths between nodes are either fully within a chunk or the
+                        // nodes are in different chunks
+                        self.get_chunk(start)
+                            .find_path(start, next_pos, &mut get_cost, &self.neighborhood) // TODO: handle solid start
+                            .expect("Inconsistency in Pathfinding")
+                    });
+
+                    if next_pos == *goal {
+                        out.insert(
+                            *goal,
+                            AbstractPath::from_known_path(
+                                self.neighborhood.clone(),
+                                new_start_path.clone(),
+                            ),
+                        );
+                        continue;
+                    }
+
+                    start_path = Some(new_start_path);
+                    path = &path[index..];
                 }
-                final_path.add_path_segment(self.nodes[*a].edges[b].clone());
             }
 
-            if skip_last {
-                final_path.add_path(
-                    // reasoning for chunk containment: see start_path equivalent
-                    self.get_chunk(before_goal)
-                        .find_path(before_goal, *goal, &mut get_cost, &self.neighborhood)
-                        .expect("Inconsistency in Pathfinding"),
-                );
-            } else if let Some(path) = goal_path {
+            let mut goal_path = goal_path.take();
+            if goal_path.is_none() {
+                // goal is itself a node, so leave the goal as is
+            } else {
+                // same as with start_path, but for the goal
+                let candidate = path
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .skip(1) // skip the current candidate
+                    .take_while(|(_, &id)| self.same_chunk(*goal, self.nodes[id].pos))
+                    .last();
+
+                if let Some((index, id)) = candidate {
+                    let previous_pos = self.nodes[*id].pos;
+                    let new_goal_path = self
+                        .get_chunk(*goal)
+                        .find_path(previous_pos, *goal, &mut get_cost, &self.neighborhood)
+                        .expect("Inconsistency in Pathfinding");
+
+                    goal_path = Some(new_goal_path);
+                    path = &path[..=index];
+                }
+            }
+
+            let mut final_path = AbstractPath::new(self.neighborhood.clone(), start);
+
+            if let Some(path) = start_path {
                 final_path.add_path(path.clone());
             }
-            ret.insert(*goal, final_path);
+
+            for (a, b) in path.windows(2).map(|w| (w[0], w[1])) {
+                final_path.add_path_segment(self.nodes[a].edges[&b].clone());
+            }
+
+            if let Some(path) = goal_path {
+                final_path.add_path(path);
+            }
+
+            out.insert(*goal, final_path);
         }
-        ret
     }
 
     fn connect_nodes(&mut self, ids: Option<NodeIDSet>) {
