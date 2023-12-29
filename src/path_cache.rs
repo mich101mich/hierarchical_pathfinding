@@ -77,7 +77,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ///     [0, 1, 0, 2, 0],
     ///     [0, 0, 0, 2, 0],
     /// ];
-    /// let (width, height) = (grid.len(), grid[0].len());
+    /// let (width, height) = (grid[0].len(), grid.len());
     /// type Grid = [[usize; 5]; 5];
     ///
     /// const COST_MAP: [isize; 3] = [1, 10, -1];
@@ -318,7 +318,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 1, 0, 2, 0],
     /// #     [0, 0, 0, 2, 0],
     /// # ];
-    /// # let (width, height) = (grid.len(), grid[0].len());
+    /// # let (width, height) = (grid[0].len(), grid.len());
     /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
@@ -364,7 +364,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 1, 0, 2, 0],
     /// #     [0, 0, 0, 2, 0],
     /// # ];
-    /// # let (width, height) = (grid.len(), grid[0].len());
+    /// # let (width, height) = (grid[0].len(), grid.len());
     /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
@@ -415,7 +415,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 1, 0, 2, 0],
     /// #     [0, 0, 0, 2, 0],
     /// # ];
-    /// # let (width, height) = (grid.len(), grid[0].len());
+    /// # let (width, height) = (grid[0].len(), grid.len());
     /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
@@ -560,7 +560,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 1, 0, 2, 0],
     /// #     [0, 0, 0, 2, 0],
     /// # ];
-    /// # let (width, height) = (grid.len(), grid[0].len());
+    /// # let (width, height) = (grid[0].len(), grid.len());
     /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
@@ -599,7 +599,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 1, 0, 2, 0],
     /// #     [0, 0, 0, 2, 0],
     /// # ];
-    /// # let (width, height) = (grid.len(), grid[0].len());
+    /// # let (width, height) = (grid[0].len(), grid.len());
     /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
@@ -655,7 +655,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 1, 0, 2, 0],
     /// #     [0, 0, 0, 2, 0],
     /// # ];
-    /// # let (width, height) = (grid.len(), grid[0].len());
+    /// # let (width, height) = (grid[0].len(), grid.len());
     /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
@@ -701,7 +701,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 1, 0, 2, 0],
     /// #     [0, 0, 0, 2, 0],
     /// # ];
-    /// # let (width, height) = (grid.len(), grid[0].len());
+    /// # let (width, height) = (grid[0].len(), grid.len());
     /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
@@ -851,7 +851,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 1, 0, 2, 0],
     /// #     [0, 0, 0, 2, 0],
     /// # ];
-    /// # let (width, height) = (grid.len(), grid[0].len());
+    /// # let (width, height) = (grid[0].len(), grid.len());
     /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
@@ -1182,7 +1182,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     /// #     [0, 1, 0, 2, 0],
     /// #     [0, 0, 0, 2, 0],
     /// # ];
-    /// # let (width, height) = (grid.len(), grid[0].len());
+    /// # let (width, height) = (grid[0].len(), grid.len());
     /// # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
     /// #     move |(x, y)| [1, 10, -1][grid[y][x]]
     /// # }
@@ -1517,7 +1517,7 @@ mod tests {
             [0, 1, 0, 2, 0],
             [0, 0, 0, 2, 0],
         ];
-        let (width, height) = (grid.len(), grid[0].len());
+        let (width, height) = (grid[0].len(), grid.len());
         fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Fn((usize, usize)) -> isize {
             move |(x, y)| [1, 10, -1][grid[y][x]]
         }

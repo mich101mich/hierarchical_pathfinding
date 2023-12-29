@@ -1,6 +1,6 @@
 [package]
 name = "hierarchical_pathfinding"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["mich101mich <mich101mich@gmail.com>"]
 edition = "2021"
 description = "Quickly approximate Paths on a Grid"
