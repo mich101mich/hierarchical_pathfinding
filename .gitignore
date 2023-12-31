@@ -1,5 +1,6 @@
 **/*.rs.bk
 /target
-Cargo.lock
-benchmark/target
-benchmark/Cargo.lock
+/Cargo.lock
+/benchmark/target
+/benchmark/Cargo.lock
+/test_dirs/

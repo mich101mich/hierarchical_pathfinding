@@ -112,7 +112,7 @@ mod tests {
             [0, 1, 0, 2, 0],
             [0, 0, 0, 2, 0],
         ];
-        let (width, height) = (grid.len(), grid[0].len());
+        let (width, height) = (grid[0].len(), grid.len());
 
         let neighborhood = ManhattanNeighborhood::new(width, height);
 
@@ -143,7 +143,7 @@ mod tests {
             [0, 1, 0, 2, 0],
             [0, 0, 0, 2, 0],
         ];
-        let (width, height) = (grid.len(), grid[0].len());
+        let (width, height) = (grid[0].len(), grid.len());
 
         let neighborhood = ManhattanNeighborhood::new(width, height);
 

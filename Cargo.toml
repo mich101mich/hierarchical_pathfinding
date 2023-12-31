@@ -1,6 +1,6 @@
 [package]
 name = "hierarchical_pathfinding"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["mich101mich <mich101mich@gmail.com>"]
 edition = "2021"
 description = "Quickly approximate Paths on a Grid"
@@ -17,15 +17,18 @@ exclude = [
 ]
 
 [dependencies]
-hashbrown = "0.12"
-log = { version = "0.4", optional = true }   # Feature used for measuring internal timings. Recommended to leave this off unless working on improvements to hierarchical_pathfinding.
-rayon = { version = "1.5", optional = true }  # don't set this directly, use feature `parallel` instead.
+hashbrown = "0.14.0"
+log = { version = "0.4.0", optional = true }   # Feature used for measuring internal timings. Recommended to leave this off unless working on improvements to hierarchical_pathfinding.
+rayon = { version = "1.8.0", optional = true }  # don't set this directly, use feature `parallel` instead.
 
 [dev-dependencies]
-criterion = "0.3"
-env_logger = "0.9"
-log = "0.4"
-nanorand = "0.7"
+criterion = "0.5.0"
+env_logger = "0.10.0"
+log = "0.4.0"
+nanorand = "0.7.0"
+
+# fixes for minimal-versions
+serde = "1.0.100" # dependency of criterion: 'serde = "1.0"', but 1.0.0 to 1.0.99 stopped working
 
 [features]
 default = ["parallel"]

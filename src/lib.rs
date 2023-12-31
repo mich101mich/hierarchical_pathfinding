@@ -66,7 +66,7 @@
 //!     [0, 1, 0, 2, 0],
 //!     [0, 0, 0, 2, 0],
 //! ];
-//! let (width, height) = (grid.len(), grid[0].len());
+//! let (width, height) = (grid[0].len(), grid.len());
 //!
 //! let cost_map = [
 //!     1,  // empty
@@ -83,7 +83,7 @@
 //! #     [0, 1, 0, 2, 0],
 //! #     [0, 0, 0, 2, 0],
 //! # ];
-//! # let (width, height) = (grid.len(), grid[0].len());
+//! # let (width, height) = (grid[0].len(), grid.len());
 //! # let cost_map = [
 //! #     1,  // empty
 //! #     10, // swamp
@@ -116,7 +116,7 @@
 //! #     [0, 1, 0, 2, 0],
 //! #     [0, 0, 0, 2, 0],
 //! # ];
-//! # let (width, height) = (grid.len(), grid[0].len());
+//! # let (width, height) = (grid[0].len(), grid.len());
 //! # type Grid = [[usize; 5]; 5];
 //! const COST_MAP: [isize; 3] = [1, 10, -1]; // now const for ownership reasons
 //!
@@ -147,7 +147,7 @@
 //! #     [0, 1, 0, 2, 0],
 //! #     [0, 0, 0, 2, 0],
 //! # ];
-//! # let (width, height) = (grid.len(), grid[0].len());
+//! # let (width, height) = (grid[0].len(), grid.len());
 //! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
@@ -185,7 +185,7 @@
 //! #     [0, 1, 0, 2, 0],
 //! #     [0, 0, 0, 2, 0],
 //! # ];
-//! # let (width, height) = (grid.len(), grid[0].len());
+//! # let (width, height) = (grid[0].len(), grid.len());
 //! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
@@ -233,7 +233,7 @@
 //!   - Returns a `Vec<(usize, usize)>`
 //!
 //! Note that [`resolve`](internals::AbstractPath::resolve) calculates any missing segments (if [`config.cache_paths`](crate::PathCacheConfig::cache_paths) ` == false`)
-//! and allocates a [`Vec`](std::vec::Vec) with the resulting Points. Not recommended if only the
+//! and allocates a [`Vec`] with the resulting Points. Not recommended if only the
 //! beginning of the Path is needed.
 //! ```
 //! # use hierarchical_pathfinding::prelude::*;
@@ -244,7 +244,7 @@
 //! #     [0, 1, 0, 2, 0],
 //! #     [0, 0, 0, 2, 0],
 //! # ];
-//! # let (width, height) = (grid.len(), grid[0].len());
+//! # let (width, height) = (grid[0].len(), grid.len());
 //! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
@@ -301,7 +301,7 @@
 //! #     [0, 1, 0, 2, 0],
 //! #     [0, 0, 0, 2, 0],
 //! # ];
-//! # let (width, height) = (grid.len(), grid[0].len());
+//! # let (width, height) = (grid[0].len(), grid.len());
 //! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
@@ -333,7 +333,7 @@
 //! #     [0, 1, 0, 2, 0],
 //! #     [0, 0, 0, 2, 0],
 //! # ];
-//! # let (width, height) = (grid.len(), grid[0].len());
+//! # let (width, height) = (grid[0].len(), grid.len());
 //! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }
@@ -375,7 +375,7 @@
 //! #     [0, 1, 0, 2, 0],
 //! #     [0, 0, 0, 2, 0],
 //! # ];
-//! # let (width, height) = (grid.len(), grid[0].len());
+//! # let (width, height) = (grid[0].len(), grid.len());
 //! # fn cost_fn(grid: &[[usize; 5]; 5]) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
 //! #     move |(x, y)| [1, 10, -1][grid[y][x]]
 //! # }

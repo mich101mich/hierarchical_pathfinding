@@ -1,32 +1,40 @@
 name: Tests
 
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+  push: { branches: [ master ] }
+  pull_request: { branches: [ master ] }
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  stable:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v2
-    - name: Rust Cache
-      uses: Swatinem/rust-cache@v1.2.0
-    - name: rust-toolchain
-      uses: actions-rs/toolchain@v1.0.6
-      with:
-        toolchain: nightly
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+    - uses: actions-rs/toolchain@v1.0.6
+      with: { toolchain: stable }
     - name: Run tests
       run: cargo test
-    - name: Run nightly tests
-      run: cargo +nightly test
-    - name: Run seq tests
+    - name: Run tests without features
       run: cargo test --no-default-features
-    - name: Run nightly seq tests
-      run: cargo +nightly test --no-default-features
+    - name: Run feature tests for `parallel`
+      run: cargo test --no-default-features --features parallel
+    - name: Run feature tests for `log`
+      run: cargo test --no-default-features --features log
+
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions-rs/toolchain@v1.0.6
+      with: { toolchain: nightly }
+    - name: Run tests
+      run: cargo test
+    - name: Run tests without features
+      run: cargo test --no-default-features
+    - name: Run feature tests for `parallel`
+      run: cargo test --no-default-features --features parallel
+    - name: Run feature tests for `log`
+      run: cargo test --no-default-features --features log
