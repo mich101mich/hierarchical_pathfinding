@@ -8,7 +8,7 @@ use crate::{grid, neighbors::Neighborhood, Point};
 /// segments of this Path that are not yet calculated. In those cases, since the cost function is
 /// required to resolve those sections, it is necessary to call
 /// [`safe_next()`](AbstractPath::safe_next) or [`resolve()`](AbstractPath::resolve).
-/// Otherwise it is possible to treat this as an Iterator<Point>.
+/// Otherwise it is possible to treat this as an `Iterator<Item = Point>`.
 ///
 /// **Warning: Calling `next()` on an AbstractPath with unknown segments will panic as soon as those
 /// segments are reached.**

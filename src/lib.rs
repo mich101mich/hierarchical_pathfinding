@@ -233,7 +233,7 @@
 //!   - Returns a `Vec<(usize, usize)>`
 //!
 //! Note that [`resolve`](internals::AbstractPath::resolve) calculates any missing segments (if [`config.cache_paths`](crate::PathCacheConfig::cache_paths) ` == false`)
-//! and allocates a [`Vec`](std::vec::Vec) with the resulting Points. Not recommended if only the
+//! and allocates a [`Vec`] with the resulting Points. Not recommended if only the
 //! beginning of the Path is needed.
 //! ```
 //! # use hierarchical_pathfinding::prelude::*;
