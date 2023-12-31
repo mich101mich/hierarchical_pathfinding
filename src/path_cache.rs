@@ -451,6 +451,16 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         #[cfg(feature = "log")]
         let (outer_timer, timer) = (std::time::Instant::now(), std::time::Instant::now());
 
+        if !self.in_bounds(start) {
+            panic!(
+                "start {:?} is out of bounds of a grid of size {}x{}",
+                start, self.width, self.height
+            );
+        }
+        if !self.in_bounds(goal) {
+            return None;
+        }
+
         if get_cost(start) < 0 {
             // cannot start on a wall
             return None;
@@ -721,7 +731,6 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         goals: &[Point],
         get_cost: impl FnMut(Point) -> isize,
     ) -> Option<(Point, AbstractPath<N>)> {
-        // TODO: bound check goals
         self.find_paths_internal(start, goals, get_cost, true)
             .into_iter()
             .next()
@@ -734,6 +743,12 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         mut get_cost: impl FnMut(Point) -> isize,
         only_closest_goal: bool,
     ) -> PointMap<AbstractPath<N>> {
+        if !self.in_bounds(start) {
+            panic!(
+                "start {:?} is out of bounds of a grid of size {}x{}",
+                start, self.width, self.height
+            );
+        }
         if get_cost(start) < 0 || goals.is_empty() {
             return PointMap::default();
         }
@@ -784,10 +799,18 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                 continue;
             }
 
+            if !self.in_bounds(goal) {
+                continue;
+            }
+
             let (goal_id, goal_path) =
                 if let Some(g) = self.find_nearest_node(goal, &mut get_cost, true) {
                     g
                 } else {
+                    // goal is in a cave within a chunk. If it was the same cave as start,
+                    // then we would have already stopped at the `find_nearest_node` for start.
+                    // Since we didn't, we know that goal is in a different cave that is not
+                    // reachable from the node network.
                     continue;
                 };
 
@@ -1221,6 +1244,10 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         }
     }
 
+    fn in_bounds(&self, point: Point) -> bool {
+        point.0 < self.width && point.1 < self.height
+    }
+
     fn get_chunk_pos(&self, point: Point) -> Point {
         let size = self.config.chunk_size;
         ((point.0 / size) * size, (point.1 / size) * size)
@@ -1348,7 +1375,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                         // and paths between nodes are either fully within a chunk or the
                         // nodes are in different chunks
                         self.get_chunk(start)
-                            .find_path(start, next_pos, &mut get_cost, &self.neighborhood) // TODO: handle solid start
+                            .find_path(start, next_pos, &mut get_cost, &self.neighborhood)
                             .expect("Inconsistency in Pathfinding")
                     });
 

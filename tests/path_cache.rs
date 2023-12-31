@@ -149,3 +149,130 @@ fn skip_first_and_last() {
     assert!(path.is_some());
     assert_eq!(path.unwrap().1.resolve(cost_fn(&grid)), vec![goal]);
 }
+
+#[test]
+fn from_github_issue_7_example_1() {
+    use hierarchical_pathfinding::prelude::*;
+
+    type Grid = [[usize; 7]; 7];
+
+    const COST_MAP: [isize; 3] = [1, 10, -1]; // now const for ownership reasons
+
+    // only borrows the Grid when called
+    fn cost_fn(grid: &Grid) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
+        move |(x, y)| COST_MAP[grid[y][x]]
+    }
+
+    fn neighbors(x: usize, y: usize) -> [(usize, usize); 4] {
+        [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    }
+
+    fn main() {
+        // 0 = empty, 1 = swamp, 2 = wall
+        let grid: Grid = [
+            [2, 2, 0, 0, 0, 0, 0],
+            [2, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 2, 2, 0, 0],
+            [0, 1, 0, 1, 2, 0, 0],
+            [0, 0, 0, 2, 2, 0, 0],
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 2, 2],
+        ];
+        let (width, height) = (grid[0].len(), grid.len());
+
+        let pathfinding = PathCache::new(
+            (width, height),
+            cost_fn(&grid),
+            ManhattanNeighborhood::new(width, height),
+            PathCacheConfig::with_chunk_size(3),
+        );
+
+        let path = pathfinding.find_closest_goal((1, 1), &neighbors(1, 3), cost_fn(&grid));
+        assert!(path.is_some());
+        let path = pathfinding.find_closest_goal((1, 3), &neighbors(1, 1), cost_fn(&grid));
+        assert!(path.is_some());
+    }
+
+    main();
+}
+
+#[test]
+fn from_github_issue_7_example_2() {
+    use hierarchical_pathfinding::prelude::*;
+
+    type Grid = [[usize; 7]; 7];
+
+    const COST_MAP: [isize; 3] = [1, 10, -1]; // now const for ownership reasons
+
+    // only borrows the Grid when called
+    fn cost_fn(grid: &Grid) -> impl '_ + Sync + Fn((usize, usize)) -> isize {
+        move |(x, y)| COST_MAP[grid[y][x]]
+    }
+
+    fn neighbors(pos: (usize, usize)) -> [(isize, isize); 4] {
+        [
+            (pos.0 as isize + 1, pos.1 as isize),
+            (pos.0 as isize - 1, pos.1 as isize),
+            (pos.0 as isize, pos.1 as isize + 1),
+            (pos.0 as isize, pos.1 as isize - 1),
+        ]
+    }
+
+    fn main() {
+        // 0 = empty, 1 = swamp, 2 = wall
+        let grid: Grid = [
+            [2, 2, 0, 0, 0, 0, 0],
+            [2, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 2, 2, 0, 0],
+            [0, 1, 0, 1, 2, 0, 0],
+            [0, 0, 0, 2, 2, 0, 0],
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 2, 2],
+        ];
+        let (width, height) = (grid.len(), grid[0].len());
+
+        let pathfinding = PathCache::new(
+            (width, height),
+            cost_fn(&grid),
+            ManhattanNeighborhood::new(width, height),
+            PathCacheConfig::with_chunk_size(3),
+        );
+
+        let path = pathfind((1, 1), (3, 1), &grid, &pathfinding);
+        assert!(path.is_some());
+        let len = path.unwrap().len();
+        assert!(len <= 3, "len={}", len);
+        let path = pathfind((3, 1), (5, 1), &grid, &pathfinding);
+        assert!(path.is_some());
+        let len = path.unwrap().len();
+        assert!(len <= 3, "len={}", len);
+        let path = pathfind((5, 1), (3, 1), &grid, &pathfinding);
+        assert!(path.is_some());
+        let len = path.unwrap().len();
+        assert!(len <= 3, "len={}", len);
+        let path = pathfind((3, 1), (1, 1), &grid, &pathfinding);
+        assert!(path.is_some());
+        let len = path.unwrap().len();
+        assert!(len <= 3, "len={}", len);
+    }
+
+    fn pathfind(
+        pos: (usize, usize),
+        goal: (usize, usize),
+        grid: &Grid,
+        pathfinding: &PathCache<ManhattanNeighborhood>,
+    ) -> Option<Vec<(usize, usize)>> {
+        let valid_neighbors = neighbors(goal)
+            .iter()
+            .cloned()
+            .filter(|n| n.0 >= 0 && n.1 >= 0 && cost_fn(&grid)((n.0 as usize, n.1 as usize)) != -1)
+            .map(|n| (n.0 as usize, n.1 as usize))
+            .collect::<Vec<_>>();
+        println!("valid_neighbors: {:?}", valid_neighbors);
+        let (_goal, path) =
+            pathfinding.find_closest_goal(pos, &valid_neighbors.as_slice(), cost_fn(&grid))?;
+        Some(path.resolve(cost_fn(&grid)))
+    }
+
+    main();
+}
