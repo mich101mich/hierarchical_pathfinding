@@ -419,7 +419,7 @@ type PointMap<V> = hashbrown::HashMap<Point, V>;
 type PointSet = hashbrown::HashSet<Point>;
 
 /// The Type used to reference a Node in the abstracted Graph
-type NodeID = u32;
+type NodeID = usize;
 
 /// A convenience type for a [`HashMap`](hashbrown::HashMap) using [`NodeID`]s as the key
 type NodeIDMap<V> = hashbrown::HashMap<NodeID, V>;

@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct Chunk {
+pub(crate) struct Chunk {
     pub pos: Point,
     pub size: Point,
     pub nodes: NodeIDSet,

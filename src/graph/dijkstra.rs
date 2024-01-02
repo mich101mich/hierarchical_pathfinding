@@ -3,7 +3,7 @@ use super::*;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-pub fn dijkstra_search(
+pub(crate) fn dijkstra_search(
     nodes: &NodeList,
     start: NodeID,
     goals: &[NodeID],

@@ -1,17 +1,15 @@
-use crate::{path::PathSegment, NodeID, NodeIDMap, Point};
+use crate::{path::PathSegment, NodeIDMap, Point};
 
 #[derive(Clone, Debug)]
-pub struct Node {
-    pub id: NodeID,
+pub(crate) struct Node {
     pub pos: Point,
     pub walk_cost: usize,
     pub edges: NodeIDMap<PathSegment>,
 }
 
 impl Node {
-    pub fn new(id: NodeID, pos: Point, walk_cost: usize) -> Node {
+    pub fn new(pos: Point, walk_cost: usize) -> Node {
         Node {
-            id,
             pos,
             walk_cost,
             edges: NodeIDMap::default(),

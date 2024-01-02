@@ -1,15 +1,15 @@
 mod node_list;
-pub use node_list::NodeList;
+pub(crate) use node_list::NodeList;
 
 mod node;
-pub use node::Node;
+pub(crate) use node::Node;
 
 mod a_star;
-pub use a_star::a_star_search;
+pub(crate) use a_star::a_star_search;
 
 mod dijkstra;
-pub use dijkstra::dijkstra_search;
+pub(crate) use dijkstra::dijkstra_search;
 
-pub(crate) use crate::grid::{Element, HeuristicElement};
-pub(crate) use crate::path::Path;
-pub(crate) use crate::{NodeID, NodeIDMap, NodeIDSet};
+use crate::grid::{Element, HeuristicElement};
+use crate::path::Path;
+use crate::{NodeID, NodeIDMap, NodeIDSet};

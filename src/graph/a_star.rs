@@ -4,7 +4,7 @@ use crate::neighbors::Neighborhood;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-pub fn a_star_search<N: Neighborhood>(
+pub(crate) fn a_star_search<N: Neighborhood>(
     nodes: &NodeList,
     start: NodeID,
     goal: NodeID,

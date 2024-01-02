@@ -1485,7 +1485,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 #[derive(Debug)]
 pub struct CacheInspector<'a, N: Neighborhood> {
     src: &'a PathCache<N>,
-    inner: std::vec::IntoIter<NodeID>,
+    inner: slab::Iter<'a, Node>,
 }
 
 impl<'a, N: Neighborhood> CacheInspector<'a, N> {
@@ -1495,22 +1495,24 @@ impl<'a, N: Neighborhood> CacheInspector<'a, N> {
     pub fn new(src: &'a PathCache<N>) -> Self {
         CacheInspector {
             src,
-            inner: src.nodes.keys().to_vec().into_iter(),
+            inner: src.nodes.iter(),
         }
     }
 
     /// Provides the handle to a specific Node.
     ///
     /// It is recommended to use the `Iterator` implementation instead
-    pub fn get_node(&self, id: NodeID) -> NodeInspector<N> {
-        NodeInspector::new(self.src, id)
+    pub fn get_node(&self, id: u32) -> NodeInspector<N> {
+        NodeInspector::new(self.src, id as NodeID)
     }
 }
 
 impl<'a, N: Neighborhood> Iterator for CacheInspector<'a, N> {
     type Item = NodeInspector<'a, N>;
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|id| NodeInspector::new(self.src, id))
+        self.inner
+            .next()
+            .map(|id| NodeInspector::new(self.src, id.0))
     }
 }
 
@@ -1525,6 +1527,7 @@ impl<'a, N: Neighborhood> Iterator for CacheInspector<'a, N> {
 pub struct NodeInspector<'a, N: Neighborhood> {
     src: &'a PathCache<N>,
     node: &'a Node,
+    id: NodeID,
 }
 
 impl<'a, N: Neighborhood> NodeInspector<'a, N> {
@@ -1532,6 +1535,7 @@ impl<'a, N: Neighborhood> NodeInspector<'a, N> {
         NodeInspector {
             src,
             node: &src.nodes[id],
+            id,
         }
     }
 
@@ -1543,8 +1547,8 @@ impl<'a, N: Neighborhood> NodeInspector<'a, N> {
     /// The internal unique ID
     ///
     /// IDs are unique at any point in time, but may be reused if Nodes are deleted.
-    pub fn id(&self) -> NodeID {
-        self.node.id
+    pub fn id(&self) -> u32 {
+        self.id as u32
     }
 
     /// Provides an iterator over all connected Nodes with the Cost of the Path to that Node
