@@ -52,7 +52,7 @@ pub struct PathCache<N: Neighborhood> {
 }
 
 impl<N: Neighborhood + Sync> PathCache<N> {
-    /// Creates a new PathCache
+    /// Creates a new `PathCache`
     ///
     /// ## Arguments
     /// - `(width, height)` - the size of the Grid
@@ -132,7 +132,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ) -> PathCache<N> {
         PathCache::new_internal::<fn(Point) -> isize, F>(
             (width, height),
-            CostFnWrapper::Sequential(get_cost, Default::default()),
+            CostFnWrapper::Sequential(get_cost, PhantomData::default()),
             neighborhood,
             config,
         )
@@ -846,11 +846,11 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         ret
     }
 
-    /// Notifies the PathCache that the Grid changed.
+    /// Notifies the `PathCache` that the Grid changed.
     ///
     /// This Method updates any internal Paths that might have changed when the Grid changed. This
     /// is an expensive operation and should only be performed if the change affected the walking
-    /// cost of a tile and the PathCache is needed again. If possible, try to bundle as many
+    /// cost of a tile and the `PathCache` is needed again. If possible, try to bundle as many
     /// changes as possible into a single call to `tiles_changed` to avoid unnecessary
     /// recalculations.
     ///
@@ -909,14 +909,14 @@ impl<N: Neighborhood + Sync> PathCache<N> {
             self.tiles_changed_internal::<F, fn(Point) -> isize>(
                 tiles,
                 CostFnWrapper::Parallel(get_cost),
-            )
+            );
         }
         #[cfg(not(feature = "parallel"))]
         {
             self.tiles_changed_internal::<fn(Point) -> isize, F>(
                 tiles,
                 CostFnWrapper::Sequential(get_cost, PhantomData),
-            )
+            );
         }
     }
 
@@ -933,7 +933,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         self.tiles_changed_internal::<fn(Point) -> isize, F>(
             tiles,
             CostFnWrapper::Sequential(get_cost, PhantomData),
-        )
+        );
     }
 
     fn tiles_changed_internal<F1, F2>(
@@ -1182,9 +1182,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         re_trace!("total time", outer_timer);
     }
 
-    /// Allows for debugging and visualizing the PathCache
+    /// Allows for debugging and visualizing the `PathCache`
     ///
-    /// The returned object gives read-only access to the current state of the PathCache, mainly the
+    /// The returned object gives read-only access to the current state of the `PathCache`, mainly the
     /// Nodes and how they are connected to each other
     ///
     /// ## Examples
@@ -1273,7 +1273,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
         self.nodes.id_at(pos)
     }
 
-    /// Returns the config used to create this PathCache
+    /// Returns the config used to create this `PathCache`
     pub fn config(&self) -> &PathCacheConfig {
         &self.config
     }
@@ -1439,27 +1439,40 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     }
 
     fn connect_nodes(&mut self, ids: Option<NodeIDSet>) {
-        let ids = ids.unwrap_or_else(|| self.nodes.keys().collect());
         let mut target = vec![];
-        for id in ids {
-            let (pos, cost) = {
-                let node = &self.nodes[id];
-                (node.pos, node.walk_cost)
-            };
+        let mut new_paths = vec![];
+        let mut seen = NodeIDSet::default();
+
+        // we iterate over ids if they exist or self.nodes otherwise, which cannot be unified
+        // without allocations, so we extract the body of the loop as a function instead
+        let convert = |(id, node): (NodeID, &Node)| {
+            seen.insert(id);
+
             target.clear();
-            self.neighborhood.get_all_neighbors(pos, &mut target);
+            self.neighborhood.get_all_neighbors(node.pos, &mut target);
             for &other_pos in target.iter() {
                 if let Some(other_id) = self.node_at(other_pos) {
-                    self.nodes.add_edge(
-                        id,
-                        other_id,
-                        PathSegment::new(
-                            Path::from_slice(&[pos, other_pos], cost),
-                            self.config.cache_paths,
-                        ),
+                    if node.edges.contains_key(&other_id) || seen.contains(&other_id) {
+                        continue;
+                    }
+                    let path = PathSegment::new(
+                        Path::from_slice(&[node.pos, other_pos], node.walk_cost),
+                        self.config.cache_paths,
                     );
+                    new_paths.push((id, other_id, path));
                 }
             }
+        };
+        match ids {
+            Some(ids) => ids
+                .iter()
+                .map(|&id| (id, &self.nodes[id]))
+                .for_each(convert),
+            None => self.nodes.iter().for_each(convert),
+        };
+
+        for (id, other_id, path) in new_paths {
+            self.nodes.add_edge(id, other_id, path);
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    graph::*,
+    graph::NodeList,
     neighbors::Neighborhood,
     path::{Path, PathSegment},
     *,

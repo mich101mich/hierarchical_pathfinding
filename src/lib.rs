@@ -10,6 +10,7 @@
     unused_import_braces,
     unused_qualifications
 )]
+#![warn(clippy::pedantic)]
 #![allow(clippy::upper_case_acronyms)]
 
 //! A crate to quickly approximate Paths on a Grid.
@@ -102,8 +103,8 @@
 //! (`Array`, `Vec`, `HashMap`, `kd-tree`, ...). Instead, it takes a callback function that
 //! indicates, how "expensive" walking across a Tile is (negative numbers for solid obstacles).
 //!
-//! Unfortunately, it is necessary to provide this function to every method of PathCache, since
-//! storing it would make the Grid immutable. See also [Updating the PathCache](#updating-the-pathcache).
+//! Unfortunately, it is necessary to provide this function to every method of `PathCache`, since
+//! storing it would make the Grid immutable. See also [Updating the `PathCache`](#updating-the-pathcache).
 //!
 //! [Currying](https://en.wikipedia.org/wiki/Currying) can be used to reduce duplication:
 //! ```
@@ -288,10 +289,10 @@
 //! assert_eq!(player.pos, goal);
 //! ```
 //!
-//! ##### Updating the PathCache
-//! The PathCache does not contain a copy or reference of the Grid for mutability and Ownership reasons.
-//! This means however, that the user is responsible for storing and maintaining both the Grid and the PathCache.
-//! It is also necessary to update the PathCache when the Grid has changed to keep it consistent:
+//! ##### Updating the `PathCache`
+//! The `PathCache` does not contain a copy or reference of the Grid for mutability and Ownership reasons.
+//! This means however, that the user is responsible for storing and maintaining both the Grid and the `PathCache`.
+//! It is also necessary to update the `PathCache` when the Grid has changed to keep it consistent:
 //! ```should_panic
 //! # use hierarchical_pathfinding::prelude::*;
 //! # let mut grid = [
@@ -364,7 +365,7 @@
 //! performance reasons.
 //!
 //! ##### Configuration
-//! The last parameter for PathCache::new is a [`PathCacheConfig`] object with different options to have more control over the generated PathCache.
+//! The last parameter for [`PathCache::new`] is a [`PathCacheConfig`] object with different options to have more control over the generated `PathCache`.
 //! These options are mostly used to adjust the balance between Performance and Memory Usage, with the default values aiming more at Performance.
 //! ```
 //! # use hierarchical_pathfinding::prelude::*;
@@ -404,8 +405,8 @@
 //!
 //! The log feature is used to enable internal timings on some functions.
 //!
-//! You probably shouldn't enable this feature unless you are working on improvments to hierarchical_pathfinding.
-//! In order to comsume the logs, you need a logger setup to show trace! level logs.
+//! You probably shouldn't enable this feature unless you are working on improvements to `hierarchical_pathfinding`.
+//! In order to consume the logs, you need a logger setup to show trace! level logs.
 //! See the [log](https://crates.io/crates/log) crate for more details.
 //!
 
@@ -420,9 +421,9 @@ type PointSet = hashbrown::HashSet<Point>;
 /// The Type used to reference a Node in the abstracted Graph
 type NodeID = u32;
 
-/// A convenience type for a [`HashMap`](hashbrown::HashMap) using NodeIDs as the key
+/// A convenience type for a [`HashMap`](hashbrown::HashMap) using [`NodeID`]s as the key
 type NodeIDMap<V> = hashbrown::HashMap<NodeID, V>;
-/// A convenience type for a [`HashSet`](hashbrown::HashSet) with NodeIDs
+/// A convenience type for a [`HashSet`](hashbrown::HashSet) with [`NodeID`]s
 type NodeIDSet = hashbrown::HashSet<NodeID>;
 
 mod path_cache;

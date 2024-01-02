@@ -100,7 +100,7 @@ pub struct PathCacheConfig {
 }
 
 impl PathCacheConfig {
-    /// Creates a new PathCacheConfig with the given `chunk_size`.
+    /// Creates a new `PathCacheConfig` with the given `chunk_size`.
     /// ```
     /// # use hierarchical_pathfinding::PathCacheConfig;
     /// let chunk_size = 123;
@@ -115,11 +115,11 @@ impl PathCacheConfig {
     pub fn with_chunk_size(chunk_size: usize) -> Self {
         Self {
             chunk_size,
-            ..Default::default()
+            ..Self::default()
         }
     }
 
-    /// an example PathCacheConfig with options set to reduce Memory Usage
+    /// an example `PathCacheConfig` with options set to reduce Memory Usage
     ///
     /// Values:
     /// ```
@@ -140,7 +140,7 @@ impl PathCacheConfig {
         a_star_fallback: true,
         perfect_paths: false,
     };
-    /// an example PathCacheConfig with options set to improve Performance
+    /// an example `PathCacheConfig` with options set to improve Performance
     ///
     /// Values:
     /// ```

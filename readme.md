@@ -10,18 +10,24 @@ Provides a fast algorithm for finding Paths on a Grid-like structure by caching 
 
 Implementation based on the Paper ["Near Optimal Hierarchical Path-Finding"](https://www.researchgate.net/profile/Adi-Botea/publication/228785110_Near_optimal_hierarchical_path-finding_HPA/links/09e41508fc2fed9a72000000/Near-optimal-hierarchical-path-finding-HPA.pdf).
 
+### Use Case
+A 2D Grid with
+- Constant/maximum size
+- Every Tile has a cost of traversing that Tile (cost is per Tile and _not_ per Edge between Tiles)
+- Changes are rare or locally contained (or at least much rarer than Path calculations).
+
 ### Advantages
 - Finding a Path is a lot faster compared to regular algorithms (A*, Dijkstra)
 - It is always correct: A Path is found **if and only if** it exists
   - This means that Hierarchical Pathfinding can be used as Heuristic to check if a Path exists and how long it will roughly be (upper bound)
 
 ### Disadvantages
-- Paths are slightly worse (negligible in most cases)
+- Paths are slightly worse than optimal (negligible in most cases)
 - Creating the cache takes time (only happens once at the start)
 - Changes to the Grid require updating the cache
   - Whenever a Tile within a Chunk changes, that entire Chunk needs to recalculate its Paths. Performance depends on Chunk size (configurable) and the number of Nodes in a Chunk
 
-## Use Case
+## Explanation
 
 Finding Paths on a Grid is an expensive Operation. Consider the following Setup:
 
@@ -53,8 +59,8 @@ use hierarchical_pathfinding::prelude::*;
 let mut pathfinding = PathCache::new(
     (width, height),   // the size of the Grid
     |(x, y)| walking_cost(x, y),   // get the cost for walking over a Tile
-    ManhattanNeighborhood::new(width, height),   // the Neighborhood
-    PathCacheConfig::with_chunk_size(3),   // config
+    ManhattanNeighborhood::new(width, height),   // the connection between Tiles
+    PathCacheConfig::with_chunk_size(3),   // additional config params
 );
 
 let start = (0, 0);

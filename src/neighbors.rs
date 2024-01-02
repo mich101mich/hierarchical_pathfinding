@@ -58,7 +58,7 @@ pub struct ManhattanNeighborhood {
 }
 
 impl ManhattanNeighborhood {
-    /// Creates a new ManhattanNeighborhood.
+    /// Creates a new `ManhattanNeighborhood`.
     ///
     /// `width` and `height` are the size of the Grid to move on.
     pub fn new(width: usize, height: usize) -> ManhattanNeighborhood {
@@ -73,7 +73,7 @@ impl Neighborhood for ManhattanNeighborhood {
         #[rustfmt::skip]
         static ALL_DELTAS: [(isize, isize); 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
 
-        for (dx, dy) in ALL_DELTAS.iter() {
+        for (dx, dy) in &ALL_DELTAS {
             let x = point.0 as isize + dx;
             let y = point.1 as isize + dy;
             if x >= 0 && x < width as isize && y >= 0 && y < height as isize {
@@ -116,7 +116,7 @@ pub struct MooreNeighborhood {
 }
 
 impl MooreNeighborhood {
-    /// Creates a new MooreNeighborhood.
+    /// Creates a new `MooreNeighborhood`.
     ///
     /// `width` and `height` are the size of the Grid to move on.
     pub fn new(width: usize, height: usize) -> MooreNeighborhood {
