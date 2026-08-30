@@ -265,13 +265,13 @@ fn from_github_issue_7_example_2() {
         let valid_neighbors = neighbors(goal)
             .iter()
             .cloned()
-            .filter(|n| n.0 >= 0 && n.1 >= 0 && cost_fn(&grid)((n.0 as usize, n.1 as usize)) != -1)
+            .filter(|n| n.0 >= 0 && n.1 >= 0 && cost_fn(grid)((n.0 as usize, n.1 as usize)) != -1)
             .map(|n| (n.0 as usize, n.1 as usize))
             .collect::<Vec<_>>();
         println!("valid_neighbors: {:?}", valid_neighbors);
         let (_goal, path) =
-            pathfinding.find_closest_goal(pos, &valid_neighbors.as_slice(), cost_fn(&grid))?;
-        Some(path.resolve(cost_fn(&grid)))
+            pathfinding.find_closest_goal(pos, valid_neighbors.as_slice(), cost_fn(grid))?;
+        Some(path.resolve(cost_fn(grid)))
     }
 
     main();

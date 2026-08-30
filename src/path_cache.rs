@@ -132,7 +132,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ) -> PathCache<N> {
         PathCache::new_internal::<fn(Point) -> isize, F>(
             (width, height),
-            CostFnWrapper::Sequential(get_cost, PhantomData::default()),
+            CostFnWrapper::Sequential(get_cost, PhantomData),
             neighborhood,
             config,
         )
@@ -1226,7 +1226,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
     ///     }
     /// }
     /// ```
-    pub fn inspect_nodes(&self) -> CacheInspector<N> {
+    pub fn inspect_nodes(&self) -> CacheInspector<'_, N> {
         CacheInspector::new(self)
     }
 
@@ -1482,10 +1482,9 @@ impl<N: Neighborhood + Sync> PathCache<N> {
 /// See [`inspect_nodes`](PathCache::inspect_nodes) for details and an example.
 ///
 /// Allows iteration over all Nodes and specific lookup with [`get_node`](CacheInspector::get_node)
-#[derive(Debug)]
 pub struct CacheInspector<'a, N: Neighborhood> {
     src: &'a PathCache<N>,
-    inner: slab::Iter<'a, Node>,
+    inner: Box<dyn Iterator<Item = (NodeID, &'a Node)> + 'a>,
 }
 
 impl<'a, N: Neighborhood> CacheInspector<'a, N> {
@@ -1495,15 +1494,8 @@ impl<'a, N: Neighborhood> CacheInspector<'a, N> {
     pub fn new(src: &'a PathCache<N>) -> Self {
         CacheInspector {
             src,
-            inner: src.nodes.iter(),
+            inner: Box::new(src.nodes.iter()),
         }
-    }
-
-    /// Provides the handle to a specific Node.
-    ///
-    /// It is recommended to use the `Iterator` implementation instead
-    pub fn get_node(&self, id: u32) -> NodeInspector<N> {
-        NodeInspector::new(self.src, id as NodeID)
     }
 }
 
@@ -1512,7 +1504,15 @@ impl<'a, N: Neighborhood> Iterator for CacheInspector<'a, N> {
     fn next(&mut self) -> Option<Self::Item> {
         self.inner
             .next()
-            .map(|id| NodeInspector::new(self.src, id.0))
+            .map(|(id, _)| NodeInspector::new(self.src, id))
+    }
+}
+
+impl<N: Neighborhood> std::fmt::Debug for CacheInspector<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CacheInspector")
+            .field("src", &self.src)
+            .finish()
     }
 }
 
@@ -1548,7 +1548,8 @@ impl<'a, N: Neighborhood> NodeInspector<'a, N> {
     ///
     /// IDs are unique at any point in time, but may be reused if Nodes are deleted.
     pub fn id(&self) -> u32 {
-        self.id as u32
+        use slotmap::Key;
+        (self.id.data().as_ffi() & 0xFFFF_FFFF) as u32
     }
 
     /// Provides an iterator over all connected Nodes with the Cost of the Path to that Node

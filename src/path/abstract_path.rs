@@ -340,7 +340,7 @@ mod tests {
             let path = pathfinding.find_path((0, 0), (w - 1, w - 1), |_| 1);
             assert!(path.is_some());
 
-            let pathfinding = crate::PathCache::new(
+            let pathfinding = PathCache::new(
                 (w, w),
                 |_| 1,
                 ManhattanNeighborhood::new(w, w),

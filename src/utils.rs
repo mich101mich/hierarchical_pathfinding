@@ -15,16 +15,15 @@ use crate::Point;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dir {
-    UP = 0,
-    RIGHT = 1,
-    DOWN = 2,
-    LEFT = 3,
+    Up = 0,
+    Right = 1,
+    Down = 2,
+    Left = 3,
 }
-pub use self::Dir::*;
 
 impl Dir {
     pub fn all() -> std::iter::Copied<std::slice::Iter<'static, Dir>> {
-        [UP, RIGHT, DOWN, LEFT].iter().copied()
+        [Dir::Up, Dir::Right, Dir::Down, Dir::Left].iter().copied()
     }
     pub fn opposite(self) -> Dir {
         ((self.num() + 2) % 4).into()
@@ -33,7 +32,7 @@ impl Dir {
         self as usize
     }
     pub fn is_vertical(self) -> bool {
-        self == UP || self == DOWN
+        self == Dir::Up || self == Dir::Down
     }
 }
 
@@ -42,10 +41,10 @@ macro_rules! impl_from_into {
         impl From<$type> for Dir {
             fn from(val: $type) -> Dir {
                 match val {
-                    0 => UP,
-                    1 => RIGHT,
-                    2 => DOWN,
-                    3 => LEFT,
+                    0 => Dir::Up,
+                    1 => Dir::Right,
+                    2 => Dir::Down,
+                    3 => Dir::Left,
                     _ => panic!("invalid Dir: {}", val),
                 }
             }
@@ -110,9 +109,12 @@ mod tests {
     #[test]
     fn jump_test() {
         let pos = (1, 3);
-        assert_eq!(jump_in_dir(pos, UP, 2, (0, 0), (5, 5)), Some((1, 1)));
-        assert_eq!(jump_in_dir(pos, RIGHT, 2, (0, 0), (5, 5)), Some((3, 3)));
-        assert_eq!(jump_in_dir(pos, DOWN, 2, (0, 0), (5, 5)), None);
-        assert_eq!(jump_in_dir(pos, LEFT, 2, (0, 0), (5, 5)), None);
+        assert_eq!(jump_in_dir(pos, Dir::Up, 2, (0, 0), (5, 5)), Some((1, 1)));
+        assert_eq!(
+            jump_in_dir(pos, Dir::Right, 2, (0, 0), (5, 5)),
+            Some((3, 3))
+        );
+        assert_eq!(jump_in_dir(pos, Dir::Down, 2, (0, 0), (5, 5)), None);
+        assert_eq!(jump_in_dir(pos, Dir::Left, 2, (0, 0), (5, 5)), None);
     }
 }

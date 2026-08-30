@@ -1,16 +1,18 @@
 use super::{Node, NodeID, NodeIDMap, NodeIDSet};
 use crate::{path::PathSegment, Point, PointMap};
 
+use slotmap::SlotMap;
+
 #[derive(Clone, Debug)]
 pub(crate) struct NodeList {
-    nodes: slab::Slab<Node>,
+    nodes: SlotMap<NodeID, Node>,
     pos_map: PointMap<NodeID>,
 }
 
 impl NodeList {
     pub fn new() -> Self {
         Self {
-            nodes: slab::Slab::default(),
+            nodes: SlotMap::with_key(),
             pos_map: PointMap::default(),
         }
     }
@@ -47,14 +49,16 @@ impl NodeList {
 
     #[track_caller]
     pub fn remove_node(&mut self, id: NodeID) {
-        let node = self.nodes.remove(id);
+        let Some(node) = self.nodes.remove(id) else {
+            panic!("Node with id {:?} does not exist", id);
+        };
         for (other_id, _) in node.edges {
             self[other_id].edges.remove(&id);
         }
         self.pos_map.remove(&node.pos);
     }
 
-    pub fn iter(&self) -> slab::Iter<Node> {
+    pub fn iter(&self) -> impl Iterator<Item = (NodeID, &Node)> {
         self.nodes.iter()
     }
 

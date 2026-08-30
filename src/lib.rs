@@ -1,8 +1,5 @@
 #![deny(
-    missing_docs,
-    // missing_doc_code_examples,
     missing_debug_implementations,
-    missing_copy_implementations,
     trivial_casts,
     trivial_numeric_casts,
     unsafe_code,
@@ -10,8 +7,14 @@
     unused_import_braces,
     unused_qualifications
 )]
-#![warn(clippy::pedantic)]
-#![allow(clippy::upper_case_acronyms)]
+//
+// set of clippy pedantic lints that I disagree with
+#![allow(
+    clippy::wildcard_imports,
+    clippy::enum_glob_use,
+    clippy::manual_assert, // I don't want the "assertion failed" text in the panic message
+    clippy::items_after_statements // if an item is only used locally, define it where it is needed
+)]
 
 //! A crate to quickly approximate Paths on a Grid.
 //!
@@ -418,8 +421,10 @@ type PointMap<V> = hashbrown::HashMap<Point, V>;
 /// A convenience type for a [`HashSet`](hashbrown::HashSet) with Points
 type PointSet = hashbrown::HashSet<Point>;
 
-/// The Type used to reference a Node in the abstracted Graph
-type NodeID = usize;
+slotmap::new_key_type! {
+    /// The Type used to reference a Node in the abstracted Graph
+    pub(crate) struct NodeID;
+}
 
 /// A convenience type for a [`HashMap`](hashbrown::HashMap) using [`NodeID`]s as the key
 type NodeIDMap<V> = hashbrown::HashMap<NodeID, V>;

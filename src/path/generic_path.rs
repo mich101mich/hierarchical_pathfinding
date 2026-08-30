@@ -51,7 +51,7 @@ impl<P> Path<P> {
     }
 
     /// Returns an Iterator over the Path
-    pub fn iter(&self) -> Iter<P> {
+    pub fn iter(&self) -> Iter<'_, P> {
         Iter {
             iter: self.path.iter(),
             reversed: self.is_reversed,

@@ -15,9 +15,9 @@ use std::fmt::Debug;
 ///
 /// The most common implementations of this Trait are already provided by this Module:
 /// - [`ManhattanNeighborhood`] for Agents that can move
-/// up, down, left or right
+///   up, down, left or right
 /// - [`MooreNeighborhood`] for Agents that can move
-/// up, down, left, right, as well as the 4 diagonals (up-right, ...)
+///   up, down, left, right, as well as the 4 diagonals (up-right, ...)
 pub trait Neighborhood: Clone + Debug {
     /// Provides all the Neighbors of a Point.
     ///
@@ -82,16 +82,8 @@ impl Neighborhood for ManhattanNeighborhood {
         }
     }
     fn heuristic(&self, point: Point, goal: Point) -> usize {
-        let diff_0 = if goal.0 > point.0 {
-            goal.0 - point.0
-        } else {
-            point.0 - goal.0
-        };
-        let diff_1 = if goal.1 > point.1 {
-            goal.1 - point.1
-        } else {
-            point.1 - goal.1
-        };
+        let diff_0 = goal.0.abs_diff(point.0);
+        let diff_1 = goal.1.abs_diff(point.1);
         diff_0 + diff_1
     }
 }
@@ -140,16 +132,8 @@ impl Neighborhood for MooreNeighborhood {
         }
     }
     fn heuristic(&self, point: Point, goal: Point) -> usize {
-        let diff_0 = if goal.0 > point.0 {
-            goal.0 - point.0
-        } else {
-            point.0 - goal.0
-        };
-        let diff_1 = if goal.1 > point.1 {
-            goal.1 - point.1
-        } else {
-            point.1 - goal.1
-        };
+        let diff_0 = goal.0.abs_diff(point.0);
+        let diff_1 = goal.1.abs_diff(point.1);
         diff_0.max(diff_1)
     }
 }

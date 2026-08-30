@@ -33,10 +33,10 @@ impl Chunk {
         let mut candidates = PointSet::default();
 
         for dir in Dir::all() {
-            if dir == UP && chunk.top() == 0
-                || dir == RIGHT && chunk.right() == total_size.0
-                || dir == DOWN && chunk.bottom() == total_size.1
-                || dir == LEFT && chunk.left() == 0
+            if dir == Dir::Up && chunk.top() == 0
+                || dir == Dir::Right && chunk.right() == total_size.0
+                || dir == Dir::Down && chunk.bottom() == total_size.1
+                || dir == Dir::Left && chunk.left() == 0
             {
                 continue;
             }
@@ -70,9 +70,9 @@ impl Chunk {
             (self.pos.0, self.pos.1),
         ][dir.num()];
         let (next_dir, length) = if dir.is_vertical() {
-            (RIGHT, self.size.0)
+            (Dir::Right, self.size.0)
         } else {
-            (DOWN, self.size.1)
+            (Dir::Down, self.size.1)
         };
         // 0 == up: start at top-left, go right
         // 1 == right: start at top-right, go down
@@ -358,10 +358,10 @@ impl Chunk {
 
     pub fn at_side(&self, point: Point, side: Dir) -> bool {
         match side {
-            UP => point.1 == self.top(),
-            RIGHT => point.0 == self.right() - 1,
-            DOWN => point.1 == self.bottom() - 1,
-            LEFT => point.0 == self.left(),
+            Dir::Up => point.1 == self.top(),
+            Dir::Right => point.0 == self.right() - 1,
+            Dir::Down => point.1 == self.bottom() - 1,
+            Dir::Left => point.0 == self.left(),
         }
     }
 
