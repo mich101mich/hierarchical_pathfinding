@@ -431,6 +431,9 @@ type NodeIDMap<V> = hashbrown::HashMap<NodeID, V>;
 /// A convenience type for a [`HashSet`](hashbrown::HashSet) with [`NodeID`]s
 type NodeIDSet = hashbrown::HashSet<NodeID>;
 
+mod dense_path_cache;
+pub use dense_path_cache::DensePathCache;
+
 mod path_cache;
 pub use self::path_cache::{PathCache, PathCacheConfig};
 
@@ -453,7 +456,7 @@ pub mod internals {
 /// The prelude for this crate.
 pub mod prelude {
     pub use crate::{
-        neighbors::{ManhattanNeighborhood, MooreNeighborhood, Neighborhood},
         PathCache, PathCacheConfig,
+        neighbors::{ManhattanNeighborhood, MooreNeighborhood, Neighborhood},
     };
 }

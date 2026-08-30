@@ -1,5 +1,5 @@
 use super::{Node, NodeID, NodeIDMap, NodeIDSet};
-use crate::{path::PathSegment, Point, PointMap};
+use crate::{Point, PointMap, path::PathSegment};
 
 use slotmap::SlotMap;
 
@@ -29,10 +29,10 @@ impl NodeList {
 
     pub fn add_edge(&mut self, src: NodeID, target: NodeID, path: PathSegment) {
         let src_node = &self[src];
-        if let Some(existing) = src_node.edges.get(&target) {
-            if existing.cost() == path.cost() {
-                return;
-            }
+        if let Some(existing) = src_node.edges.get(&target)
+            && existing.cost() == path.cost()
+        {
+            return;
         }
         let src_cost = src_node.walk_cost;
 

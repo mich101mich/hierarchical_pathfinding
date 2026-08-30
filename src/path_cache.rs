@@ -1405,7 +1405,7 @@ impl<N: Neighborhood + Sync> PathCache<N> {
                     .enumerate()
                     .rev()
                     .skip(1) // skip the current candidate
-                    .take_while(|(_, &id)| self.same_chunk(*goal, self.nodes[id].pos))
+                    .take_while(|&(_, &id)| self.same_chunk(*goal, self.nodes[id].pos))
                     .last();
 
                 if let Some((index, id)) = candidate {
