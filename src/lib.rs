@@ -432,7 +432,7 @@ type NodeIDMap<V> = hashbrown::HashMap<NodeID, V>;
 type NodeIDSet = hashbrown::HashSet<NodeID>;
 
 mod dense_path_cache;
-pub use dense_path_cache::DensePathCache;
+pub use dense_path_cache::{DensePathCache, PathSegment as DensePathSegment};
 
 mod path_cache;
 pub use self::path_cache::{PathCache, PathCacheConfig};

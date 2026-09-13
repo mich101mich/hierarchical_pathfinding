@@ -63,6 +63,7 @@ impl<T> std::fmt::Debug for DensePathCache<T> {
                 "grid",
                 &format_args!("[{}x{}]", self.width(), self.height()),
             )
+            .field("cost_fn", &format_args!("<Opaque Callback>"))
             .field("chunk_dirty", &self.chunk_dirty)
             .field("has_dirty_chunks", &self.has_dirty_chunks)
             .finish_non_exhaustive()
@@ -96,6 +97,75 @@ enum InnerPath {
     Super(Vec<Arc<PathSegment>>),
 }
 
+#[derive(Debug)]
+pub struct PathSegmentIter<'a> {
+    inner: InnerPathSegmentIter<'a>,
+    remaining: usize,
+}
+type InnerPathSegmentSuperIter<'a> = std::iter::FlatMap<
+    std::slice::Iter<'a, Arc<PathSegment>>,
+    PathSegmentIter<'a>,
+    fn(&'a Arc<PathSegment>) -> PathSegmentIter<'a>,
+>;
+
+#[derive(Debug)]
+enum InnerPathSegmentIter<'a> {
+    Raw(std::slice::Iter<'a, Point>),
+    Super(Box<InnerPathSegmentSuperIter<'a>>),
+}
+
+impl<'a> Iterator for PathSegmentIter<'a> {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = match &mut self.inner {
+            InnerPathSegmentIter::Raw(iter) => iter.next().copied(),
+            InnerPathSegmentIter::Super(iter) => iter.next(),
+        };
+        if ret.is_some() {
+            self.remaining -= 1;
+        }
+        ret
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
+}
+
+impl<'a> std::iter::FusedIterator for PathSegmentIter<'a> {}
+impl<'a> ExactSizeIterator for PathSegmentIter<'a> {
+    fn len(&self) -> usize {
+        self.remaining
+    }
+}
+
+impl PathSegment {
+    pub fn cost(&self) -> usize {
+        self.cost
+    }
+
+    pub fn length(&self) -> usize {
+        self.len
+    }
+
+    pub fn iter<'a>(&'a self) -> PathSegmentIter<'a> {
+        PathSegmentIter {
+            inner: match &self.inner {
+                InnerPath::Raw(points) => {
+                    let mut iter = points.iter();
+                    iter.next();
+                    InnerPathSegmentIter::Raw(iter)
+                }
+                InnerPath::Super(segments) => {
+                    InnerPathSegmentIter::Super(Box::new(segments.iter().flat_map(|s| s.iter())))
+                }
+            },
+            remaining: self.len,
+        }
+    }
+}
+
 // Thoughts on finding the neighbors of a given position:
 // - We want to use PathSegments to skip as much distance as possible.
 // - We need to take individual steps within the start/end chunk, since the start/end points are (most likely) not
@@ -122,7 +192,7 @@ enum InnerPath {
 //   the current position within the hierarchy.
 //
 // Example:
-// Chunks level 1:                 Chunks level 2:                 Chunks level 3:
+// Chunks level 1:             Chunks level 2:             Chunks level 3:
 // +0----+1----+2----+3----+   +0----------+1----------+   +0----------------------+
 // 0P    |P    |*    |*    |   0<          |P          |   0<                      |
 // |     |     |     |     |   |           |           |   |                       |
@@ -309,7 +379,7 @@ impl<T> DensePathCache<T> {
     ) -> Option<PathSegment> {
         assert!(
             !self.has_dirty_chunks,
-            "Called find_path_no_update with dirty chunks. Call update_cache first."
+            "Called find_path_no_update with dirty chunks. Call update_cache first or use find_path."
         );
 
         todo!("Implement using {start:?}, {end:?}")
@@ -344,7 +414,7 @@ impl<T> DensePathCache<T> {
     ) -> Vec<Option<PathSegment>> {
         assert!(
             !self.has_dirty_chunks,
-            "Called find_all_paths_no_update with dirty chunks. Call update_cache first."
+            "Called find_all_paths_no_update with dirty chunks. Call update_cache first or use find_all_paths."
         );
 
         todo!("Implement using {start:?}, {ends:?}")
@@ -382,7 +452,7 @@ impl<T> DensePathCache<T> {
     ) -> Option<PathSegment> {
         assert!(
             !self.has_dirty_chunks,
-            "Called find_any_path_no_update with dirty chunks. Call update_cache first."
+            "Called find_any_path_no_update with dirty chunks. Call update_cache first or use find_any_path."
         );
 
         todo!("Implement using {start:?}, {ends:?}")
@@ -411,5 +481,21 @@ mod tests {
     fn check_send_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<DensePathCache<i32>>();
+        assert_send_sync::<PathSegment>();
+    }
+
+    #[test]
+    fn check_can_multithread_finds() {
+        let cache = Arc::new(DensePathCache::new(
+            vec![vec![0; 16]; 16],
+            Box::new(|_, _, _| Some(1)),
+        ));
+        let cache2 = Arc::clone(&cache);
+
+        let t1 = std::thread::spawn(move || cache.find_path_no_update((0, 0), (15, 15)).unwrap());
+        let t2 = std::thread::spawn(move || cache2.find_path_no_update((0, 0), (0, 15)).unwrap());
+
+        t1.join().unwrap();
+        t2.join().unwrap();
     }
 }
