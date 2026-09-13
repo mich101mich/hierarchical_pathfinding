@@ -2,9 +2,21 @@
 
 use std::sync::Arc;
 
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
+
+mod construct;
+mod find;
+mod path;
+mod update;
+mod utils;
+
+pub use path::{PathSegment, PathSegmentIter};
+
+use utils::*;
 
 type Point = (usize, usize);
+type Cost = Option<usize>;
+const CHUNK_SIZE: usize = 8;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Entry<'a, T> {
@@ -37,133 +49,32 @@ impl Dir {
     }
 }
 
-type Callback<T> = dyn Fn(Entry<'_, T>, Dir, Entry<'_, T>) -> Option<usize> + Send + Sync;
-
-const CHUNK_SIZE: usize = 8;
-
-const fn to_chunk_pos((x, y): (usize, usize)) -> (usize, usize) {
-    (x / CHUNK_SIZE, y / CHUNK_SIZE)
-}
+type InputCallback<T> = dyn Fn(Entry<'_, T>, Dir, Entry<'_, T>) -> Cost + Send + Sync;
+type Callback<T> = dyn Fn(Point, Dir, &'_ [Vec<T>]) -> Cost + Send + Sync;
 
 /// Hierarchical path cache for a dense 2D grid with a fixed size.
 pub struct DensePathCache<T> {
     grid: Vec<Vec<T>>,
+    chunks: Vec<Vec<Chunk>>,
     cost_fn: Box<Callback<T>>,
 
-    chunk_dirty: Vec<Vec<bool>>,
-    has_dirty_chunks: bool,
-
-    exits: HashMap<Point, Exit>,
+    dirty_chunks: HashSet<Point>,
 }
 
-impl<T> std::fmt::Debug for DensePathCache<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DensePathCache")
-            .field(
-                "grid",
-                &format_args!("[{}x{}]", self.width(), self.height()),
-            )
-            .field("cost_fn", &format_args!("<Opaque Callback>"))
-            .field("chunk_dirty", &self.chunk_dirty)
-            .field("has_dirty_chunks", &self.has_dirty_chunks)
-            .finish_non_exhaustive()
-    }
+struct Chunk {
+    top_exits: [Option<Exit>; CHUNK_SIZE],
+    bottom_exits: [Option<Exit>; CHUNK_SIZE],
+    left_exits: [Option<Exit>; CHUNK_SIZE - 2], // excluding the corners, they are in top/bottom
+    right_exits: [Option<Exit>; CHUNK_SIZE - 2],
 }
 
 /// An exit of a chunk. May be a corner.
+#[derive(Default)]
 struct Exit {
     /// Paths within the chunk to other exits, arranged by layer.
     internal_paths: Vec<HashMap<Point, Arc<PathSegment>>>,
     /// The sides of the chunk that this exit is on. Indexed by [`Dir`]
-    open_sides: [bool; 4],
-}
-
-/// A segment of a path. Might itself consist of more segments.
-#[derive(Debug, Clone)]
-pub struct PathSegment {
-    /// The actual path, or a list of subsegments.
-    inner: InnerPath,
-    /// The cost of traversing this path segment.
-    cost: usize,
-    /// The length of this path segment.
-    len: usize,
-}
-
-#[derive(Debug, Clone)]
-enum InnerPath {
-    /// A direct path through the grid.
-    Raw(Vec<Point>),
-    /// A path through a superchunk, consisting of multiple subsegments.
-    Super(Vec<Arc<PathSegment>>),
-}
-
-#[derive(Debug)]
-pub struct PathSegmentIter<'a> {
-    inner: InnerPathSegmentIter<'a>,
-    remaining: usize,
-}
-type InnerPathSegmentSuperIter<'a> = std::iter::FlatMap<
-    std::slice::Iter<'a, Arc<PathSegment>>,
-    PathSegmentIter<'a>,
-    fn(&'a Arc<PathSegment>) -> PathSegmentIter<'a>,
->;
-
-#[derive(Debug)]
-enum InnerPathSegmentIter<'a> {
-    Raw(std::slice::Iter<'a, Point>),
-    Super(Box<InnerPathSegmentSuperIter<'a>>),
-}
-
-impl<'a> Iterator for PathSegmentIter<'a> {
-    type Item = Point;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let ret = match &mut self.inner {
-            InnerPathSegmentIter::Raw(iter) => iter.next().copied(),
-            InnerPathSegmentIter::Super(iter) => iter.next(),
-        };
-        if ret.is_some() {
-            self.remaining -= 1;
-        }
-        ret
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.remaining, Some(self.remaining))
-    }
-}
-
-impl<'a> std::iter::FusedIterator for PathSegmentIter<'a> {}
-impl<'a> ExactSizeIterator for PathSegmentIter<'a> {
-    fn len(&self) -> usize {
-        self.remaining
-    }
-}
-
-impl PathSegment {
-    pub fn cost(&self) -> usize {
-        self.cost
-    }
-
-    pub fn length(&self) -> usize {
-        self.len
-    }
-
-    pub fn iter<'a>(&'a self) -> PathSegmentIter<'a> {
-        PathSegmentIter {
-            inner: match &self.inner {
-                InnerPath::Raw(points) => {
-                    let mut iter = points.iter();
-                    iter.next();
-                    InnerPathSegmentIter::Raw(iter)
-                }
-                InnerPath::Super(segments) => {
-                    InnerPathSegmentIter::Super(Box::new(segments.iter().flat_map(|s| s.iter())))
-                }
-            },
-            remaining: self.len,
-        }
-    }
+    walk_costs: [Cost; 4],
 }
 
 // Thoughts on finding the neighbors of a given position:
@@ -247,28 +158,15 @@ impl PathSegment {
 //   for each of those exits. To avoid this, we first check the predecessor that was used to get here. If it is in the
 //   same chunk, skip looking at exits and only look at the partners of this exit in the neighboring chunks.
 
-// public methods
-impl<T> DensePathCache<T> {
+// just the public methods, internal methods are in the modules
+impl<T: Send + Sync + 'static> DensePathCache<T> {
     /// Creates a new cache with the given grid and cost function.
-    pub fn new(grid: Vec<Vec<T>>, cost_fn: Box<Callback<T>>) -> Self {
+    pub fn new(grid: Vec<Vec<T>>, cost_fn: Box<InputCallback<T>>) -> Self {
         assert!(
             !grid.is_empty() && !grid[0].is_empty(),
             "Grid cannot be empty"
         );
-        let h = grid.len();
-        let w = grid[0].len();
-        let ch = h.div_ceil(CHUNK_SIZE);
-        let cw = w.div_ceil(CHUNK_SIZE);
-
-        DensePathCache {
-            grid,
-            cost_fn,
-
-            chunk_dirty: vec![vec![false; cw]; ch],
-            has_dirty_chunks: false,
-
-            exits: HashMap::new(),
-        }
+        Self::new_impl(grid, cost_fn)
     }
 
     /// Returns the width of the grid.
@@ -307,8 +205,7 @@ impl<T> DensePathCache<T> {
         let ret = self.grid.get_mut(y)?.get_mut(x)?;
 
         let (cx, cy) = to_chunk_pos((x, y));
-        self.chunk_dirty[cy][cx] = true; // index guaranteed to be valid because of the previous get_mut calls
-        self.has_dirty_chunks = true;
+        self.dirty_chunks.insert((cx, cy));
 
         Some(ret)
     }
@@ -332,7 +229,7 @@ impl<T> DensePathCache<T> {
     /// Returns whether the cache needs to be updated. If this returns `true`, the next path request will trigger a
     /// cache update, and calls to `*_no_update` methods will panic.
     pub fn needs_update(&self) -> bool {
-        self.has_dirty_chunks
+        !self.dirty_chunks.is_empty()
     }
 
     /// Updates the cache with any changes made to the grid.
@@ -345,13 +242,11 @@ impl<T> DensePathCache<T> {
     /// making multiple changes to the grid, it is recommended to only call this method after all changes have been
     /// made.
     pub fn update_cache(&mut self) {
-        if !self.has_dirty_chunks {
+        if self.dirty_chunks.is_empty() {
             return;
         }
 
-        todo!();
-
-        self.has_dirty_chunks = false;
+        self.update_cache_impl();
     }
 
     /// Finds the shortest path between two positions in the grid.
@@ -378,11 +273,10 @@ impl<T> DensePathCache<T> {
         end: (usize, usize),
     ) -> Option<PathSegment> {
         assert!(
-            !self.has_dirty_chunks,
+            self.dirty_chunks.is_empty(),
             "Called find_path_no_update with dirty chunks. Call update_cache first or use find_path."
         );
-
-        todo!("Implement using {start:?}, {end:?}")
+        self.find_path_impl(start, end)
     }
 
     /// Finds the shortest path from a start position to multiple end positions in the grid.
@@ -413,11 +307,11 @@ impl<T> DensePathCache<T> {
         ends: &[(usize, usize)],
     ) -> Vec<Option<PathSegment>> {
         assert!(
-            !self.has_dirty_chunks,
+            self.dirty_chunks.is_empty(),
             "Called find_all_paths_no_update with dirty chunks. Call update_cache first or use find_all_paths."
         );
 
-        todo!("Implement using {start:?}, {ends:?}")
+        self.find_all_paths_impl(start, ends)
     }
 
     /// Finds the shortest path from a start position to any of multiple end positions in the grid.
@@ -451,25 +345,24 @@ impl<T> DensePathCache<T> {
         ends: &[(usize, usize)],
     ) -> Option<PathSegment> {
         assert!(
-            !self.has_dirty_chunks,
+            self.dirty_chunks.is_empty(),
             "Called find_any_path_no_update with dirty chunks. Call update_cache first or use find_any_path."
         );
 
-        todo!("Implement using {start:?}, {ends:?}")
+        self.find_any_path_impl(start, ends)
     }
 }
 
-// internal methods
-impl<T> DensePathCache<T> {
-    /// Returns the opposite exit of a given exit, if it exists.
-    fn opposite_exit(&self, (x, y): Point, dir: Dir) -> Option<Point> {
-        let (ox, oy) = match dir {
-            Dir::Up => (x, y.checked_sub(1)?),
-            Dir::Right => (Some(x + 1).filter(|ox| *ox < self.width())?, y),
-            Dir::Down => (x, Some(y + 1).filter(|oy| *oy < self.height())?),
-            Dir::Left => (x.checked_sub(1)?, y),
-        };
-        Some((ox, oy))
+impl<T: Send + Sync + 'static> std::fmt::Debug for DensePathCache<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DensePathCache")
+            .field(
+                "grid",
+                &format_args!("[{}x{}]", self.width(), self.height()),
+            )
+            .field("cost_fn", &format_args!("<Opaque Callback>"))
+            .field("dirty_chunks", &self.dirty_chunks)
+            .finish_non_exhaustive()
     }
 }
 
@@ -479,7 +372,7 @@ mod tests {
 
     #[test]
     fn check_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
+        fn assert_send_sync<T: Send + Sync + 'static>() {}
         assert_send_sync::<DensePathCache<i32>>();
         assert_send_sync::<PathSegment>();
     }
