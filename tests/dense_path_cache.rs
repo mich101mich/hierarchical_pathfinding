@@ -57,6 +57,27 @@ fn get_mut_modifies_value_and_marks_dirty() {
 }
 
 #[test]
+fn entry_marks_dirty_only_on_modification() {
+    let grid = vec![vec![0; 16]; 16];
+    let mut cache = DensePathCache::new(grid, Box::new(|_, _, _| Some(1)));
+
+    assert!(!cache.needs_update());
+
+    {
+        let entry = cache.entry((5, 5)).unwrap();
+        assert_eq!(*entry, 0); // read-only access
+    }
+    assert!(!cache.needs_update()); // no modification, so should not be dirty
+
+    {
+        let mut entry = cache.entry((5, 5)).unwrap();
+        *entry = 99; // modify the value
+    }
+    assert_eq!(cache.get((5, 5)), Some(&99));
+    assert!(cache.needs_update()); // modification should mark dirty
+}
+
+#[test]
 fn set_replaces_value_and_marks_dirty() {
     let grid = vec![vec![10; 16]; 16];
     let mut cache = DensePathCache::new(grid, Box::new(|_, _, _| Some(1)));

@@ -6,11 +6,11 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     pub(super) fn new_impl(grid: Vec<Vec<T>>, cost_fn: Box<InputCallback<T>>) -> DensePathCache<T> {
         let cost_fn = Box::new(move |a, dir: Dir, grid: &[Vec<T>]| {
             let b = dir.step(a, (grid[0].len(), grid.len()))?;
-            let entry_a = Entry {
+            let entry_a = GridCell {
                 value: &grid[a.1][a.0],
                 pos: a,
             };
-            let entry_b = Entry {
+            let entry_b = GridCell {
                 value: &grid[b.1][b.0],
                 pos: b,
             };
@@ -70,14 +70,16 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
         };
 
         // corners can have more than one side
-        for (pos, dir) in [
+        for ((x, y), dir) in [
             ((left, top), Dir::Left),
             ((right, top), Dir::Right),
             ((left, bottom), Dir::Left),
             ((right, bottom), Dir::Right),
         ] {
-            if let Some(cost) = cost_fn(pos, dir) {
-                let exit = chunk.exit_at_mut(pos).get_or_insert_default();
+            if let Some(cost) = cost_fn((x, y), dir) {
+                let exit = chunk
+                    .exit_at_mut((x - left, y - top))
+                    .get_or_insert_default();
                 exit.walk_costs[dir as usize] = Some(cost);
             }
         }

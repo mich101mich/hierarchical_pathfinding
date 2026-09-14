@@ -17,6 +17,7 @@ pub(super) const fn to_chunk_pos((x, y): (usize, usize)) -> (usize, usize) {
 }
 
 impl Chunk {
+    #[track_caller]
     pub(super) fn exit_at(&self, (x, y): Point) -> &Option<Exit> {
         if y == 0 {
             self.top_exits.get(x)
@@ -32,6 +33,7 @@ impl Chunk {
         .unwrap()
     }
 
+    #[track_caller]
     pub(super) fn exit_at_mut(&mut self, (x, y): Point) -> &mut Option<Exit> {
         if y == 0 {
             self.top_exits.get_mut(x)
