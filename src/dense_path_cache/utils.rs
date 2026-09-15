@@ -10,6 +10,8 @@ impl Dir {
             Dir::Left => Some((x.checked_sub(1)?, y)),
         }
     }
+
+    pub(super) const ALL: [Dir; 4] = [Dir::Up, Dir::Down, Dir::Left, Dir::Right];
 }
 
 pub(super) const fn to_chunk_pos((x, y): (usize, usize)) -> (usize, usize) {

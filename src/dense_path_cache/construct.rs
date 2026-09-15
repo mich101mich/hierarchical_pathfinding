@@ -1,6 +1,24 @@
+use std::collections::BinaryHeap;
+
 use super::*;
 
 use rayon::prelude::*;
+
+#[derive(PartialEq, Eq)]
+struct HeapEntry {
+    pos: Point,
+    cost: usize,
+}
+impl PartialOrd for HeapEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for HeapEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.cost.cmp(&self.cost) // reverse order for min-heap
+    }
+}
 
 impl<T: Send + Sync + 'static> DensePathCache<T> {
     pub(super) fn new_impl(grid: Vec<Vec<T>>, cost_fn: Box<InputCallback<T>>) -> DensePathCache<T> {
@@ -90,12 +108,15 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
             .filter_map(|(pos, exit)| Some((pos, exit.as_mut()?)))
             .collect::<Vec<_>>();
 
-        while let Some((start, exit)) = all_exit_positions.pop()
-            && !all_exit_positions.is_empty()
-        {
-            let paths = dijkstra(start, &all_exit_positions, (left, top), cost_fn);
+        let mut queue = BinaryHeap::<HeapEntry>::new(); // cached between calls
 
-            exit.internal_paths.push(paths);
+        let n = all_exit_positions.len();
+        for i in 0..n {
+            // can't use normal iteration because we need both the entire array and a mutable `exit`
+            let start = all_exit_positions[i].0;
+            let paths = dijkstra(start, &all_exit_positions, (left, top), cost_fn, &mut queue);
+
+            all_exit_positions[i].1.internal_paths.push(paths);
         }
 
         chunk
@@ -107,26 +128,11 @@ fn dijkstra(
     targets: &[(Point, &mut Exit)],
     offset: (usize, usize),
     cost_fn: impl Fn(Point, Dir) -> Option<usize>,
+    queue: &mut BinaryHeap<HeapEntry>,
 ) -> HashMap<Point, Arc<PathSegment>> {
     let mut min_cost_to = [[(usize::MAX, start); CHUNK_SIZE]; CHUNK_SIZE]; // (cost, previous_point)
+    queue.clear();
 
-    #[derive(PartialEq, Eq)]
-    struct HeapEntry {
-        pos: Point,
-        cost: usize,
-    }
-    impl PartialOrd for HeapEntry {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-    impl Ord for HeapEntry {
-        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            other.cost.cmp(&self.cost) // reverse order for min-heap
-        }
-    }
-
-    let mut queue = std::collections::BinaryHeap::<HeapEntry>::new();
     min_cost_to[start.1][start.0] = (0, start);
     queue.push(HeapEntry {
         pos: start,
@@ -139,7 +145,7 @@ fn dijkstra(
             continue; // we have already found a better path to this point
         }
 
-        for &dir in &[Dir::Up, Dir::Down, Dir::Left, Dir::Right] {
+        for dir in Dir::ALL {
             let Some(next_pos) = dir.step(pos, (CHUNK_SIZE, CHUNK_SIZE)) else {
                 continue;
             };
