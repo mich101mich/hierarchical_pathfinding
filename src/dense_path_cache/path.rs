@@ -36,7 +36,7 @@ enum InnerPathSegmentIter<'a> {
     Super(Box<InnerPathSegmentSuperIter<'a>>),
 }
 
-impl<'a> Iterator for PathSegmentIter<'a> {
+impl Iterator for PathSegmentIter<'_> {
     type Item = Point;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -55,23 +55,26 @@ impl<'a> Iterator for PathSegmentIter<'a> {
     }
 }
 
-impl<'a> std::iter::FusedIterator for PathSegmentIter<'a> {}
-impl<'a> ExactSizeIterator for PathSegmentIter<'a> {
+impl std::iter::FusedIterator for PathSegmentIter<'_> {}
+impl ExactSizeIterator for PathSegmentIter<'_> {
     fn len(&self) -> usize {
         self.remaining
     }
 }
 
 impl PathSegment {
+    #[must_use]
     pub fn cost(&self) -> usize {
         self.cost
     }
 
+    #[must_use]
     pub fn length(&self) -> usize {
         self.len
     }
 
-    pub fn iter<'a>(&'a self) -> PathSegmentIter<'a> {
+    #[must_use]
+    pub fn iter(&self) -> PathSegmentIter<'_> {
         PathSegmentIter {
             inner: match &self.inner {
                 InnerPath::Raw(points) => {
@@ -85,5 +88,14 @@ impl PathSegment {
             },
             remaining: self.len,
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a PathSegment {
+    type Item = Point;
+    type IntoIter = PathSegmentIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }

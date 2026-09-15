@@ -41,9 +41,9 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
 
         DensePathCache {
             grid,
+            chunks,
             cost_fn,
             dirty_chunks,
-            chunks,
         }
     }
 
@@ -81,10 +81,10 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
         };
 
         let mut chunk = Chunk {
-            top_exits: std::array::from_fn(|dx| exit_for((left + dx, top), Dir::Up)),
-            bottom_exits: std::array::from_fn(|dx| exit_for((left + dx, bottom), Dir::Down)),
-            left_exits: std::array::from_fn(|dy| exit_for((left, top + dy), Dir::Left)),
-            right_exits: std::array::from_fn(|dy| exit_for((right, top + dy), Dir::Right)),
+            top: std::array::from_fn(|dx| exit_for((left + dx, top), Dir::Up)),
+            bottom: std::array::from_fn(|dx| exit_for((left + dx, bottom), Dir::Down)),
+            left: std::array::from_fn(|dy| exit_for((left, top + dy), Dir::Left)),
+            right: std::array::from_fn(|dy| exit_for((right, top + dy), Dir::Right)),
         };
 
         // corners can have more than one side

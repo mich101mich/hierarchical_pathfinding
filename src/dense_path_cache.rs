@@ -1,4 +1,6 @@
-#![expect(unused, reason = "still in development")]
+#![allow(unused, reason = "still in development")]
+// #![warn(clippy::pedantic)]
+#![allow(clippy::wildcard_imports)]
 
 use std::sync::Arc;
 
@@ -62,10 +64,10 @@ pub struct DensePathCache<T> {
 }
 
 struct Chunk {
-    top_exits: [Option<Exit>; CHUNK_SIZE],
-    bottom_exits: [Option<Exit>; CHUNK_SIZE],
-    left_exits: [Option<Exit>; CHUNK_SIZE - 2], // excluding the corners, they are in top/bottom
-    right_exits: [Option<Exit>; CHUNK_SIZE - 2],
+    top: [Option<Exit>; CHUNK_SIZE],
+    bottom: [Option<Exit>; CHUNK_SIZE],
+    left: [Option<Exit>; CHUNK_SIZE - 2], // excluding the corners, they are in top/bottom
+    right: [Option<Exit>; CHUNK_SIZE - 2],
 }
 
 /// An exit of a chunk. May be a corner.
@@ -83,7 +85,7 @@ pub struct Entry<'a, T> {
     dirty_entry: Option<(Point, &'a mut HashSet<Point>)>,
 }
 
-impl<'a, T> Entry<'a, T> {
+impl<T> Entry<'_, T> {
     /// Returns a mutable reference to the underlying cell **without** marking the chunk as dirty. Use with caution.
     ///
     /// This method may only be used to modify state that is entirely unrelated to the pathfinding. Any changes that
@@ -202,6 +204,11 @@ impl<T> std::ops::DerefMut for Entry<'_, T> {
 // just the public methods, internal methods are in the modules
 impl<T: Send + Sync + 'static> DensePathCache<T> {
     /// Creates a new cache with the given grid and cost function.
+    ///
+    /// ### Panics
+    ///
+    /// Panics if the grid is empty
+    #[must_use]
     pub fn new(grid: Vec<Vec<T>>, cost_fn: Box<InputCallback<T>>) -> Self {
         assert!(
             !grid.is_empty() && !grid[0].is_empty(),
@@ -211,15 +218,18 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     }
 
     /// Returns the width of the grid.
+    #[must_use]
     pub fn width(&self) -> usize {
         self.grid[0].len()
     }
     /// Returns the height of the grid.
+    #[must_use]
     pub fn height(&self) -> usize {
         self.grid.len()
     }
 
     /// Returns a reference to the value at the given position, or `None` if out of bounds.
+    #[must_use]
     pub fn get(&self, (x, y): Point) -> Option<&T> {
         self.grid.get(y).and_then(|row| row.get(x))
     }
@@ -230,6 +240,7 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     /// time that a path is requested (see [cache updates](TODO) in the crate documentation). This means that this
     /// method should only be called when you intend to make changes. If you need to check the value first, call
     /// [`get`](Self::get) first or use [`entry`](Self::entry).
+    #[must_use]
     pub fn get_mut(&mut self, (x, y): Point) -> Option<&mut T> {
         let ret = self.grid.get_mut(y)?.get_mut(x)?;
 
@@ -249,7 +260,8 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     ///
     /// `Entry`s also allow modifying the value directly without marking the chunk as dirty, though usage of that is
     /// highly discouraged.
-    pub fn entry<'a>(&'a mut self, (x, y): Point) -> Option<Entry<'a, T>> {
+    #[must_use]
+    pub fn entry(&mut self, (x, y): Point) -> Option<Entry<'_, T>> {
         let cell = self.grid.get_mut(y)?.get_mut(x)?;
 
         let dirty_entry = Some((to_chunk_pos((x, y)), &mut self.dirty_chunks));
@@ -260,6 +272,10 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     /// Sets the value at the given position, returning the old value. Panics if out of bounds.
     ///
     /// Shorthand for `std::mem::replace(cache.get_mut(pos).unwrap(), value)`.
+    ///
+    /// ### Panics
+    ///
+    /// Panics if the given position is out of bounds.
     #[track_caller]
     pub fn set(&mut self, (x, y): Point, value: T) -> T {
         let Some(cell) = self.get_mut((x, y)) else {
@@ -275,6 +291,7 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
 
     /// Returns whether the cache needs to be updated. If this returns `true`, the next path request will trigger a
     /// cache update, and calls to `*_no_update` methods will panic.
+    #[must_use = "This method only checks whether the cache needs to be updated"]
     pub fn needs_update(&self) -> bool {
         !self.dirty_chunks.is_empty()
     }
@@ -294,6 +311,8 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
         }
 
         self.update_cache_impl();
+
+        self.dirty_chunks.clear();
     }
 
     /// Finds the shortest path between two positions in the grid.
@@ -312,8 +331,10 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     /// a multi-threaded context.
     ///
     /// ### Panics
+    ///
     /// Panics if the cache is dirty. Call [`update_cache`](Self::update_cache) first if the cache might be dirty.
     #[track_caller]
+    #[must_use]
     pub fn find_path_no_update(&self, start: Point, end: Point) -> Option<PathSegment> {
         assert!(
             self.dirty_chunks.is_empty(),
@@ -323,6 +344,7 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     }
 
     /// Finds the shortest path from a start position to multiple end positions in the grid.
+    #[must_use]
     pub fn find_all_paths(&mut self, start: Point, ends: &[Point]) -> Vec<Option<PathSegment>> {
         self.update_cache();
         self.find_all_paths_no_update(start, ends)
@@ -338,8 +360,10 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     /// a multi-threaded context.
     ///
     /// ### Panics
+    ///
     /// Panics if the cache is dirty. Call [`update_cache`](Self::update_cache) first if the cache might be dirty.
     #[track_caller]
+    #[must_use]
     pub fn find_all_paths_no_update(
         &self,
         start: Point,
@@ -357,6 +381,7 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     ///
     /// This method will return the shortest path to the first end position that is reachable from the start position.
     /// If none of the end positions are reachable, it will return `None`.
+    #[must_use]
     pub fn find_any_path(&mut self, start: Point, ends: &[Point]) -> Option<PathSegment> {
         self.update_cache();
         self.find_any_path_no_update(start, ends)
@@ -372,8 +397,10 @@ impl<T: Send + Sync + 'static> DensePathCache<T> {
     /// a multi-threaded context.
     ///
     /// ### Panics
+    ///
     /// Panics if the cache is dirty. Call [`update_cache`](Self::update_cache) first if the cache might be dirty.
     #[track_caller]
+    #[must_use]
     pub fn find_any_path_no_update(&self, start: Point, ends: &[Point]) -> Option<PathSegment> {
         assert!(
             self.dirty_chunks.is_empty(),
